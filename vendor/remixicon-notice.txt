@@ -1,0 +1,5 @@
+Window icons: Remix Icon 4.6.0, by Remix Design.
+Source: https://github.com/Remix-Design/RemixIcon/tree/v4.6.0/icons/System
+Icons: subtract-line, checkbox-multiple-blank-line, close-line.
+License: Apache License 2.0, see remixicon-license.txt.
+Original vector paths are unchanged; accessibility and CSS attributes were added.

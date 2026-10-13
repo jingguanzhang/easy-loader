@@ -1,0 +1,4055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>混合打托编辑器</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css"
+    />
+    <script>
+      addEventListener("load", function () {
+        var t = document.createElement("i");
+        t.className = "ri-check-line";
+        t.style.cssText = "position:absolute;visibility:hidden";
+        document.body.appendChild(t);
+        var f = getComputedStyle(t, ":before").fontFamily.toLowerCase();
+        t.remove();
+        if (f.indexOf("remixicon") < 0) {
+          var l = document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = "vendor/remixicon.css";
+          document.head.appendChild(l);
+        }
+      });
+    </script>
+    <style>
+      /* 混合打托组合编辑器 · v4.9 布局：小屏优先的紧凑桌面风 */
+      :root {
+        font:
+          12px Tahoma,
+          "Microsoft YaHei",
+          sans-serif;
+        color: #365b72;
+        background: #edf0ed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body,
+      #pe-app {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        border: 1px solid #9bacb5;
+        background: linear-gradient(#fff, #e3e9e6);
+        padding: 2px 6px;
+        min-height: 26px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        box-shadow: inset 1px 1px #fff;
+      }
+      button:hover:not(:disabled) {
+        background: #e5eff4;
+        border-color: #759aaf;
+      }
+      button:disabled {
+        opacity: 0.48;
+        cursor: default;
+      }
+      .primary,
+      button.active {
+        background: #dceaf4;
+        border-color: #5f91b2;
+      }
+      .icon {
+        width: 16px;
+        height: 16px;
+        object-fit: contain;
+        flex: none;
+        border: 0;
+      }
+      .icon.small {
+        width: 14px;
+        height: 14px;
+      }
+      i[class^="ri-"],
+      i[class*=" ri-"] {
+        font-size: 15px;
+        line-height: 1;
+        display: inline-flex;
+      }
+      input:not([type="checkbox"]) {
+        border: 1px solid #a6b8c3;
+        background: #fff;
+        min-width: 0;
+        padding: 3px 5px;
+        height: 26px;
+        width: 100%;
+      }
+      input:focus {
+        outline: 1px solid #7bacc7;
+      }
+      input[type="checkbox"] {
+        accent-color: #3c7193;
+        cursor: pointer;
+      }
+
+      .editor-shell {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      /* ── 标题栏：操作出口集中于此，不再占工具栏 ─────────────── */
+      .pe-title {
+        height: 32px;
+        background: #244d6a;
+        color: #eef4f6;
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex: none;
+      }
+      .pe-title b {
+        font-size: 12px;
+      }
+      .pe-title-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 5px;
+      }
+      .pe-title-actions .ti-btn {
+        min-height: 24px;
+        padding: 2px 8px;
+        background: transparent;
+        border-color: #4d7391;
+        color: #dce6ea;
+        box-shadow: none;
+      }
+      .pe-title-actions .ti-btn:hover:not(:disabled) {
+        background: #2f5b7c;
+        border-color: #6d93ab;
+      }
+      .pe-title-actions .ti-btn.primary {
+        background: #3c7193;
+        border-color: #7ba8c4;
+        color: #fff;
+      }
+
+      /* ── 工具栏：图标分组，悬停出说明 ─────────────────────── */
+      .pe-toolbar {
+        padding: 4px 6px;
+        display: flex;
+        gap: 9px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #a6b8c3;
+        flex: none;
+        background: #edf0ea;
+      }
+      .tb-group {
+        display: flex;
+        gap: 2px;
+        padding-right: 8px;
+        border-right: 1px solid #c4cfd3;
+      }
+      .tb-group:last-child {
+        border-right: 0;
+        padding-right: 0;
+      }
+      .tb-group button {
+        min-width: 28px;
+        padding: 2px 5px;
+      }
+      .tb-text {
+        font-size: 12px;
+      }
+
+      /* ── 组合条 ─────────────────────────────────────────── */
+      .group-strip {
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        background: #f5f7f3;
+        border-bottom: 1px solid #b5c4cb;
+        flex: none;
+        flex-wrap: wrap;
+      }
+      .group-strip label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+      .group-strip .gs-name input {
+        width: 180px;
+        font-weight: bold;
+      }
+      .group-strip .gs-copies input {
+        width: 64px;
+      }
+      .gs-stats {
+        margin-left: auto;
+        color: #7892a1;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .reuse-inline {
+        display: flex;
+        gap: 4px;
+      }
+      .reuse-inline button {
+        min-height: 24px;
+        padding: 2px 7px;
+        white-space: nowrap;
+      }
+      .copy-switch {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .copy-switch b {
+        font-size: 11px;
+        color: #1f4a66;
+        white-space: nowrap;
+      }
+      .copy-switch > button {
+        min-height: 24px;
+        padding: 2px 5px;
+      }
+      .copy-badge {
+        font-style: normal;
+        font-size: 10px;
+        color: #7b93a0;
+        border: 1px solid #b8c8d0;
+        padding: 1px 6px;
+        background: #fbfdfc;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .copy-badge.custom {
+        color: #8a5a1e;
+        border-color: #d9b071;
+        background: #fdf4e2;
+      }
+      .copy-reset {
+        min-height: 22px;
+        padding: 1px 7px;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      /* ── 三区工作区 ─────────────────────────────────────── */
+      .pe-workspace {
+        display: flex;
+        flex: 1;
+        min-height: 180px;
+        overflow: hidden;
+      }
+      .panel-box {
+        background: #f5f7f3;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .sources {
+        width: 196px;
+        flex: none;
+        border-right: 1px solid #afbec5;
+        overflow-y: auto;
+        padding: 0 7px 7px;
+      }
+      .properties {
+        width: 250px;
+        flex: none;
+        border-left: 1px solid #afbec5;
+        overflow: hidden;
+      }
+      .panel-title {
+        min-height: 27px;
+        background: #e2e9e8;
+        border-bottom: 1px solid #adbdc6;
+        padding: 5px 8px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: bold;
+        flex: none;
+      }
+      .panel-title span {
+        font-size: 10px;
+        color: #7b93a0;
+        margin-left: auto;
+        font-weight: normal;
+      }
+      .panel-title i {
+        font-size: 14px;
+      }
+
+      /* 货源 */
+      .source-search {
+        margin: 7px 0;
+        position: relative;
+      }
+      .source-search i {
+        position: absolute;
+        left: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #8aa0ab;
+        pointer-events: none;
+      }
+      .source-search input {
+        padding-left: 22px;
+      }
+      .source-list {
+        border: 1px solid #bbcbd1;
+        background: #fafbf7;
+        margin-bottom: 7px;
+      }
+      .source-row {
+        width: 100%;
+        text-align: left;
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr);
+        gap: 3px;
+        border: 0;
+        border-bottom: 1px solid #d2dce0;
+        padding: 5px 6px;
+        background: #fafbf7;
+        box-shadow: none;
+        line-height: 1.35;
+      }
+      .source-row.selected {
+        background: #e0edf7;
+      }
+      .source-row b {
+        font-weight: normal;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .source-row small {
+        grid-column: 2;
+        font-size: 10px;
+        color: #7a949f;
+      }
+      .source-color {
+        width: 10px;
+        height: 10px;
+        border: 1px solid #0002;
+        margin-top: 3px;
+      }
+      .source-row:last-child {
+        border-bottom: 0;
+      }
+      .add-row {
+        display: flex;
+        gap: 5px;
+        align-items: end;
+        margin-bottom: 4px;
+      }
+      .add-row label {
+        display: flex;
+        flex-direction: column;
+        font-size: 10px;
+        gap: 2px;
+        flex: 1;
+      }
+      .add-row button {
+        white-space: nowrap;
+      }
+      .grid-gen {
+        border-top: 1px dashed #c0ccd1;
+        margin-top: 7px;
+        padding-top: 5px;
+      }
+      .grid-gen > summary {
+        font-size: 11px;
+        font-weight: bold;
+        color: #557c93;
+        cursor: pointer;
+        padding: 2px 0;
+      }
+      .grid-fields {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        margin: 6px 0;
+      }
+      .grid-fields label,
+      .form-grid label {
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .grid-gen button {
+        width: 100%;
+        justify-content: center;
+      }
+      .grid-gen p {
+        margin-top: 5px;
+      }
+
+      /* 参数面板选项卡 */
+      .prop-tabs {
+        display: flex;
+        flex: none;
+        background: #e2e9e8;
+        border-bottom: 1px solid #adbdc6;
+      }
+      .prop-tabs button {
+        flex: 1;
+        justify-content: center;
+        border: 0;
+        border-right: 1px solid #adbdc6;
+        background: transparent;
+        box-shadow: none;
+        min-height: 30px;
+        gap: 5px;
+        position: relative;
+        border-radius: 0;
+      }
+      .prop-tabs button:last-child {
+        border-right: 0;
+      }
+      .prop-tabs button.active {
+        background: #f5f7f3;
+        border-bottom: 2px solid #3c7193;
+        font-weight: bold;
+        color: #2c5878;
+      }
+      .tab-badge {
+        background: #5b8db8;
+        color: #fff;
+        border-radius: 8px;
+        font-size: 9px;
+        padding: 0 5px;
+        line-height: 13px;
+        min-width: 13px;
+        text-align: center;
+      }
+      .tab-badge.warn {
+        background: #bd7766;
+      }
+      .prop-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      .prop-h {
+        margin: 0 0 7px;
+        font-size: 11px;
+        color: #557c93;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+
+      /* 选中件朝向 */
+      .orientation-choices {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        margin-top: 7px;
+      }
+      .orientation-choices button {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        align-items: center;
+        min-width: 0;
+        padding: 3px;
+      }
+      .orientation-choices span {
+        width: 40px;
+        height: 36px;
+      }
+      .orientation-choices svg {
+        width: 100%;
+        height: 100%;
+      }
+      .orientation-choices small {
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      .coordinate-fields {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        font-size: 10px;
+      }
+
+      /* 校验 */
+      .error-list {
+        max-height: 150px;
+        overflow: auto;
+        margin-bottom: 6px;
+      }
+      .error-list button {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid #e8ddca;
+        background: #fff8e8;
+        box-shadow: none;
+        color: #98713c;
+        font-size: 10px;
+        line-height: 1.5;
+        text-align: left;
+        padding: 5px;
+      }
+      .good {
+        color: #648663;
+      }
+      p {
+        font-size: 10px;
+        color: #7f98a4;
+        line-height: 1.6;
+        margin: 6px 0 1px;
+      }
+
+      /* ── 中部视图 ───────────────────────────────────────── */
+      .visual {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        background: #f1f5f1;
+      }
+      .view-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 3px;
+        padding: 3px 5px;
+        border-bottom: 1px solid #bdcbd2;
+        font-size: 10px;
+        flex: none;
+      }
+      .view-bar button {
+        min-height: 23px;
+        padding: 2px 5px;
+        gap: 4px;
+      }
+      .view-bar label {
+        display: flex;
+        gap: 3px;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .view-bar input[type="number"] {
+        width: 42px;
+        height: 23px;
+      }
+      .dock-check {
+        color: #66808e;
+      }
+      .view-bar span {
+        margin-left: auto;
+        color: #91a2a8;
+      }
+      .viewport {
+        position: relative;
+        flex: 1;
+        min-height: 120px;
+        overflow: hidden;
+        background: #f7faf6;
+      }
+      .viewport canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .visual-overlay,
+      .visual-readout {
+        position: absolute;
+        pointer-events: none;
+        z-index: 2;
+        padding: 7px;
+        font-size: 10px;
+        line-height: 1.65;
+        color: #809aa7;
+      }
+      .visual-overlay {
+        top: 0;
+        left: 0;
+      }
+      .visual-readout {
+        bottom: 0;
+        right: 0;
+        background: #fafdfacc;
+        color: #456a80;
+        text-align: right;
+      }
+      .visual-foot {
+        padding: 4px 8px;
+        font-size: 10px;
+        color: #8ba0ab;
+        border-top: 1px solid #c7d3d8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ── 底部清单与状态 ─────────────────────────────────── */
+      .member-panel {
+        height: 150px;
+        min-height: 78px;
+        max-height: 32vh;
+        display: flex;
+        flex-direction: column;
+        border-top: 1px solid #a2b6c2;
+        flex: none;
+      }
+      .member-panel.collapsed {
+        height: 33px;
+        min-height: 0;
+        max-height: 33px;
+      }
+      .member-panel .panel-title button {
+        font-size: 10px;
+        min-height: 22px;
+        padding: 1px 6px;
+      }
+      .member-scroll {
+        overflow: auto;
+        flex: 1;
+        background: #fafcf9;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        white-space: nowrap;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        background: #e7edeb;
+        color: #6d899a;
+        z-index: 1;
+        font-weight: normal;
+        padding: 4px 7px;
+        border-bottom: 1px solid #b3c4ce;
+        text-align: left;
+      }
+      td {
+        border-right: 1px solid #e0e6e8;
+        border-bottom: 1px solid #e0e6e8;
+        padding: 3px 7px;
+        font-size: 11px;
+      }
+      tbody tr {
+        cursor: pointer;
+      }
+      tr.selected {
+        background: #e3eff8;
+      }
+      tr.invalid {
+        color: #a5734d;
+      }
+      td:nth-child(n + 5) {
+        font-family: Tahoma, sans-serif;
+        font-size: 10px;
+      }
+      .status-line {
+        height: 25px;
+        border-top: 1px solid #b9c8ce;
+        padding: 4px 8px;
+        display: flex;
+        justify-content: space-between;
+        color: #8097a4;
+        font-size: 10px;
+        flex: none;
+      }
+      .status-line .error {
+        color: #a55f46;
+      }
+      .status-line .success {
+        color: #578052;
+      }
+      .empty,
+      .waiting {
+        padding: 25px;
+        text-align: center;
+        color: #829aa7;
+      }
+      .busy {
+        position: absolute;
+        inset: 30px 0 0;
+        z-index: 50;
+        background: #243f5266;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .busy > div {
+        width: 340px;
+        background: #fafbf6;
+        border: 1px solid #7d97a7;
+        box-shadow: 4px 4px #172b3020;
+        padding: 20px;
+      }
+      .busy p {
+        margin: 12px 0;
+      }
+      .busy button {
+        margin-top: 8px;
+      }
+      [v-cloak] {
+        display: none;
+      }
+
+      /* ── 笔记本小屏（≤1170px）：面板改作悬靠抽屉的开关收起 ── */
+      @media (max-width: 1170px) {
+        .sources {
+          width: 184px;
+        }
+        .properties {
+          width: 238px;
+        }
+        .group-strip {
+          gap: 8px;
+        }
+        .group-strip .gs-name input {
+          width: 130px;
+        }
+        .gs-stats {
+          display: none;
+        }
+        .tb-text {
+          display: none;
+        }
+        .tb-group {
+          padding-right: 6px;
+        }
+      }
+      @media (max-width: 880px) {
+        .pe-workspace {
+          overflow: auto;
+        }
+        .sources {
+          width: 172px;
+        }
+        .properties {
+          width: 226px;
+        }
+        .group-strip {
+          font-size: 10px;
+          gap: 6px;
+          overflow-x: auto;
+          white-space: nowrap;
+          flex-wrap: nowrap;
+        }
+        .group-strip .gs-name input {
+          width: 110px;
+        }
+        .group-strip .gs-copies input {
+          width: 48px;
+        }
+        .member-panel {
+          height: 120px;
+        }
+        .pe-title b {
+          display: none;
+        }
+        .visual-readout {
+          font-size: 9px;
+        }
+        .view-bar .vb-text {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pe-app" v-cloak></div>
+    <template id="pe-template"
+      ><div class="editor-shell" @pointerdown="dismissMessage">
+        <header class="pe-title">
+          <app-icon name="pallet" class="small"></app-icon><b>混合打托组合编辑器</b>
+          <span class="pe-title-actions">
+            <button
+              class="ti-btn"
+              @click="cancel"
+              aria-label="取消"
+              title="取消，放弃所有改动 (Esc)"
+            >
+              <i class="ri-close-line" aria-hidden="true"></i><span>取消</span>
+            </button>
+            <button
+              class="ti-btn"
+              @click="save(false)"
+              :disabled="busy"
+              aria-label="保存草稿"
+              title="保存草稿，未参与装载 (Ctrl+Shift+S)"
+            >
+              <i class="ri-save-3-line" aria-hidden="true"></i><span>保存草稿</span>
+            </button>
+            <button
+              class="ti-btn primary"
+              @click="save(true)"
+              :disabled="busy || !canCommit"
+              aria-label="保存并参与装载"
+              title="保存并参与装载 (Ctrl+S)"
+              data-testid="commit-pallet"
+            >
+              <i class="ri-check-line" aria-hidden="true"></i><span>保存并参与装载</span>
+            </button>
+          </span>
+        </header>
+        <div v-if="!initialized" class="waiting">请从组合打托页面创建或编辑组合。</div>
+        <template v-else>
+          <div class="pe-toolbar">
+            <div class="tb-group">
+              <button
+                @click="undo"
+                :disabled="historyIndex <= 0 || busy"
+                aria-label="撤销"
+                title="撤销 (Ctrl+Z)"
+              >
+                <i class="ri-arrow-go-back-line" aria-hidden="true"></i>
+              </button>
+              <button
+                @click="redo"
+                :disabled="historyIndex >= history.length - 1 || busy"
+                aria-label="重做"
+                title="重做 (Ctrl+Y)"
+              >
+                <i class="ri-arrow-go-forward-line" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="tb-group">
+              <button
+                @click="copySelected"
+                :disabled="!selectedIds.length || busy"
+                aria-label="复制件"
+                title="复制选中单件 (Ctrl+D)"
+              >
+                <i class="ri-file-copy-line" aria-hidden="true"></i>
+              </button>
+              <button
+                @click="deleteSelected"
+                :disabled="!selectedIds.length || busy"
+                aria-label="删除件"
+                title="删除选中单件 (Delete)"
+              >
+                <i class="ri-delete-bin-line" aria-hidden="true"></i>
+              </button>
+              <button
+                @click="rotateSelected"
+                :disabled="!selectedIds.length || busy"
+                aria-label="旋转 R"
+                title="旋转 90° (R)"
+              >
+                <i class="ri-clockwise-2-line" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="tb-group">
+              <button
+                :class="{ active: tool === 'move' }"
+                @click="tool = 'move'"
+                aria-label="移动 / 选择"
+                title="移动 / 选择：左键选取、拖动单件"
+              >
+                <i class="ri-drag-move-2-line" aria-hidden="true"></i>
+              </button>
+              <button
+                :class="{ active: tool === 'orbit' }"
+                @click="tool = 'orbit'"
+                aria-label="查看 / 轨道"
+                title="查看 / 轨道：环绕视角，不改动货物"
+              >
+                <i class="ri-eye-line" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="tb-group">
+              <button
+                @click="moveLayer(1)"
+                :disabled="!selectedIds.length || busy"
+                aria-label="上移一层"
+                title="上移一层 (PageUp)"
+                data-testid="raise-layer"
+              >
+                <i class="ri-arrow-up-s-line" aria-hidden="true"></i>
+              </button>
+              <button
+                @click="moveLayer(-1)"
+                :disabled="!selectedIds.length || busy"
+                aria-label="下移一层"
+                title="下移一层 (PageDown)"
+                data-testid="lower-layer"
+              >
+                <i class="ri-arrow-down-s-line" aria-hidden="true"></i>
+              </button>
+              <button
+                @click="dropSelected"
+                :disabled="!selectedIds.length || busy"
+                aria-label="落到支撑面"
+                title="落到支撑面"
+              >
+                <i class="ri-arrow-down-double-line" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="tb-group">
+              <button
+                @click="repair"
+                :disabled="!viewMembers.length || busy"
+                aria-label="一键修正"
+                title="一键修正：尽量保留布局，仅修复问题件"
+                data-testid="repair-pallet"
+              >
+                <i class="ri-magic-line" aria-hidden="true"></i
+                ><span class="tb-text">一键修正</span>
+              </button>
+              <button
+                @click="arrangeWasm"
+                :disabled="!viewMembers.length || busy"
+                aria-label="自动排布"
+                title="用引擎自动排布当前托 (F5)"
+              >
+                <i class="ri-layout-masonry-line" aria-hidden="true"></i
+                ><span class="tb-text">自动排布</span>
+              </button>
+            </div>
+          </div>
+          <div class="group-strip">
+            <label class="gs-name"
+              >组合名称<input
+                v-model="group.name"
+                @change="checkpoint"
+                maxlength="100"
+                aria-label="组合名称"
+            /></label>
+            <label class="gs-copies"
+              >相同组合托数<input
+                type="number"
+                min="1"
+                max="10000"
+                v-model.number="group.copies"
+                @change="
+                  syncCopies();
+                  checkpoint();
+                "
+                aria-label="组合托数"
+            /></label>
+            <span class="reuse-inline"
+              ><button
+                @click="editorReuse('one')"
+                :disabled="busy || !reuseInfo.maxAdd"
+                aria-label="复用一托"
+                title="以模板布局再复制一托；新托可切换后单独调整"
+                data-testid="reuse-one"
+              >
+                <i class="ri-repeat-line" aria-hidden="true"></i>复用一托</button
+              ><button
+                @click="editorReuse('fill')"
+                :disabled="busy || !reuseInfo.maxAdd"
+                aria-label="摆完为止"
+                title="在库存允许范围内用模板把托摆满"
+                data-testid="reuse-fill"
+              >
+                <i class="ri-stack-line" aria-hidden="true"></i>摆完为止
+              </button></span
+            >
+            <span class="copy-switch"
+              ><button
+                @click="switchCopy(currentCopy - 1)"
+                :disabled="currentCopy <= 1"
+                aria-label="上一托"
+                data-testid="copy-prev"
+              >
+                <i class="ri-arrow-left-s-line" aria-hidden="true"></i></button
+              ><b>托 {{ currentCopy }} / {{ group.copies }}</b
+              ><button
+                @click="switchCopy(currentCopy + 1)"
+                :disabled="currentCopy >= group.copies"
+                aria-label="下一托"
+                data-testid="copy-next"
+              >
+                <i class="ri-arrow-right-s-line" aria-hidden="true"></i></button
+              ><i class="copy-badge" :class="{ custom: copyCustomized }">{{
+                currentCopy === 1 ? "模板" : copyCustomized ? "已单独调整" : "跟随模板"
+              }}</i
+              ><button
+                v-if="currentCopy > 1 && copyCustomized"
+                class="copy-reset"
+                @click="resetCopyToTemplate"
+                aria-label="恢复模板"
+                title="放弃本托的单独调整，恢复为模板布局（可撤销）"
+                data-testid="copy-reset"
+              >
+                恢复模板
+              </button></span
+            >
+            <label class="check-inline"
+              ><input type="checkbox" v-model="hasBoard" @change="checkpoint" />使用实体托盘</label
+            >
+            <span class="gs-stats"
+              >{{ validation.summary.piecesPerCopy }} 件 / 托 × {{ group.copies }} 托 · 每托
+              {{ fmt(validation.summary.weight) }} kg<template v-if="customCopyCount">
+                · 已单设 {{ customCopyCount }} 托</template
+              ></span
+            >
+          </div>
+          <div class="pe-workspace">
+            <aside class="sources panel-box" v-show="sourcesOpen">
+              <div class="panel-title">
+                可用货源 <span>{{ filteredItems.length }} 种</span>
+              </div>
+              <div class="source-search">
+                <i class="ri-search-line" aria-hidden="true"></i
+                ><input v-model="search" placeholder="查找货物…" aria-label="查找打托货物" />
+              </div>
+              <div class="source-list">
+                <button
+                  v-for="it in filteredItems"
+                  :key="it.uid"
+                  class="source-row"
+                  :class="{ selected: sourceId === it.uid }"
+                  @click="sourceId = it.uid"
+                  :title="it.name"
+                >
+                  <span class="source-color" :style="{ background: it.color }"></span
+                  ><b>{{ it.name }}</b
+                  ><small>{{ fmt(it.l) }} × {{ fmt(it.w) }} × {{ fmt(it.h) }} mm</small
+                  ><small
+                    >剩余 {{ available(it) }} 件 · 本托已用 {{ counts.get(it.uid) || 0 }} 件</small
+                  ><small
+                    >{{ it.noUnderstack ? "必须置底 · " : ""
+                    }}{{ it.noOverstack ? "不可堆叠 · " : "" }}限层 {{ it.maxStack || "不限" }} ·
+                    顺序 {{ it.priority || "自动" }}</small
+                  >
+                </button>
+              </div>
+              <div class="source-add">
+                <div class="add-row">
+                  <label
+                    >选择件数<input
+                      type="number"
+                      v-model.number="addQuantity"
+                      min="1"
+                      max="500"
+                      aria-label="新增单件数量" /></label
+                  ><button
+                    class="primary"
+                    @click="addPieces"
+                    :disabled="
+                      !chosenSource ||
+                      busy ||
+                      available(chosenSource) < Math.max(1, Number(addQuantity) || 1)
+                    "
+                    aria-label="加入组合"
+                    title="把选中货源加入当前托"
+                    data-testid="add-pieces"
+                  >
+                    <i class="ri-add-line" aria-hidden="true"></i>加入组合
+                  </button>
+                </div>
+                <p>
+                  加入与编辑只作用于当前托（上方 ◀ ▶ 切换）；库存按全部托实际用量合计预留。第 1
+                  托为模板，未单独调整的托跟随模板出货。
+                </p>
+              </div>
+              <details class="grid-gen" open>
+                <summary>行 / 列 / 层规则生成</summary>
+                <div class="grid-fields">
+                  <label
+                    >行数<input
+                      type="number"
+                      min="1"
+                      v-model.number="group.rows"
+                      aria-label="打托行数" /></label
+                  ><label
+                    >列数<input
+                      type="number"
+                      min="1"
+                      v-model.number="group.columns"
+                      aria-label="打托列数" /></label
+                  ><label
+                    >层数<input
+                      type="number"
+                      min="1"
+                      v-model.number="group.layers"
+                      aria-label="打托层数"
+                  /></label>
+                </div>
+                <button
+                  @click="generateGrid"
+                  :disabled="!chosenSource || busy"
+                  aria-label="按选中货源生成规则组合"
+                  title="按选中货源生成规则组合"
+                >
+                  按选中货源生成规则组合
+                </button>
+                <p>列沿 x 柜长，行沿 z 柜宽，层沿 y 高度。会替换当前托的布局。</p>
+              </details>
+            </aside>
+            <main class="visual">
+              <div class="view-bar">
+                <button
+                  v-for="v in views"
+                  :key="v.key"
+                  :class="{ active: view === v.key }"
+                  @click="setView(v.key)"
+                >
+                  {{ v.label }}</button
+                ><button @click="fitView" aria-label="适配视图" title="适配视图">
+                  <i class="ri-focus-3-line" aria-hidden="true"></i
+                  ><span class="vb-text">适配视图</span></button
+                ><label
+                  >吸附<input
+                    type="number"
+                    min="0"
+                    v-model.number="snap"
+                    aria-label="吸附毫米"
+                  />mm</label
+                ><label><input type="checkbox" v-model="magnet" />边缘吸附</label
+                ><label class="dock-check"
+                  ><input
+                    type="checkbox"
+                    v-model="sourcesOpen"
+                    aria-label="显示货源面板"
+                  />货源</label
+                ><label class="dock-check"
+                  ><input
+                    type="checkbox"
+                    v-model="propsOpen"
+                    aria-label="显示参数面板"
+                  />参数</label
+                ><span v-if="fallback">兼容视图</span>
+              </div>
+              <div class="viewport" ref="viewport" @contextmenu.prevent>
+                <div class="visual-overlay">
+                  {{ selectedIds.length }} 件选中 · 左键选择 / 拖动，Ctrl 多选<br />方向键移动，PageUp/Down
+                  升降一层，Shift 微调高度，R 旋转
+                </div>
+                <div class="visual-readout" v-if="selected">
+                  {{ selectedSource?.name }} · {{ dimsText(selected) }} mm<br />x
+                  {{ fmt(selected.x) }} / y {{ fmt(selected.y) }} / z {{ fmt(selected.z) }}
+                </div>
+              </div>
+              <div class="visual-foot">
+                <span class="motion-note">移动冗余 {{ fmt(motionRegion.margin) }} mm。</span> y = 0
+                为托盘顶面；整托保持竖直，水平 90°
+                {{
+                  validation.summary.yaw90Allowed ? "允许" : "受单件方向限制，禁止"
+                }}。整托无不可堆叠货物且完整支撑时可叠放。
+              </div>
+            </main>
+            <aside class="properties panel-box" v-show="propsOpen">
+              <div class="prop-tabs">
+                <button
+                  :class="{ active: propsTab === 'pallet' }"
+                  @click="propsTab = 'pallet'"
+                  aria-label="托盘参数"
+                  title="托盘与组合参数"
+                >
+                  <i class="ri-settings-5-line" aria-hidden="true"></i>参数</button
+                ><button
+                  :class="{ active: propsTab === 'item' }"
+                  @click="propsTab = 'item'"
+                  aria-label="选中单件"
+                  title="选中单件的坐标与朝向"
+                >
+                  <i class="ri-box-3-line" aria-hidden="true"></i>单件<span
+                    v-if="selectedIds.length"
+                    class="tab-badge"
+                    >{{ selectedIds.length }}</span
+                  ></button
+                ><button
+                  :class="{ active: propsTab === 'check' }"
+                  @click="propsTab = 'check'"
+                  aria-label="组合校验"
+                  title="组合校验结果"
+                >
+                  <i class="ri-checkbox-circle-line" aria-hidden="true"></i>校验<span
+                    v-if="validation.errors.length + copiesProblem.length"
+                    class="tab-badge warn"
+                    >{{ validation.errors.length + copiesProblem.length }}</span
+                  >
+                </button>
+              </div>
+              <div class="prop-body" v-show="propsTab === 'pallet'">
+                <h6 class="prop-h">{{ hasBoard ? "实体托盘参数" : "组合工作区" }}</h6>
+                <div class="form-grid">
+                  <label
+                    >长 x / mm<input
+                      type="number"
+                      min="1"
+                      v-model.number="dimensions.length"
+                      @change="checkpoint"
+                      aria-label="托盘长度" /></label
+                  ><label
+                    >宽 z / mm<input
+                      type="number"
+                      min="1"
+                      v-model.number="dimensions.width"
+                      @change="checkpoint"
+                      aria-label="托盘宽度" /></label
+                  ><template v-if="hasBoard"
+                    ><label
+                      >厚度 / mm<input
+                        type="number"
+                        min="1"
+                        v-model.number="group.pallet.thickness"
+                        @change="checkpoint"
+                        aria-label="托盘厚度" /></label
+                    ><label
+                      >自重 / kg<input
+                        type="number"
+                        min="0"
+                        v-model.number="group.pallet.weight"
+                        @change="checkpoint"
+                        aria-label="托盘自重" /></label
+                    ><label
+                      >承载上限 / kg<input
+                        type="number"
+                        min="0"
+                        v-model.number="group.pallet.maxLoad"
+                        @change="checkpoint"
+                        aria-label="托盘承载" /></label></template
+                  ><label
+                    >总高度上限 / mm<input
+                      type="number"
+                      min="0"
+                      v-model.number="group.maxHeight"
+                      @change="checkpoint"
+                      aria-label="组合高度上限"
+                  /></label>
+                </div>
+                <p>
+                  净货重 {{ fmt(validation.summary.cargoWeight) }} kg；托盘
+                  {{ fmt(validation.summary.tare) }} kg。高度上限含底板，0 不限。
+                </p>
+              </div>
+              <div class="prop-body" v-show="propsTab === 'item'">
+                <h6 class="prop-h">
+                  选中单件 ·
+                  {{
+                    selectedIds.length === 1
+                      ? selectedSource?.name || "—"
+                      : selectedIds.length + " 件"
+                  }}
+                </h6>
+                <template v-if="selected"
+                  ><div class="coordinate-fields">
+                    <label
+                      >x / 长向<input
+                        type="number"
+                        :value="selected.x"
+                        @change="
+                          setCoordinate(selected.id, 'x', $event.target.value);
+                          $event.target.value = selected.x;
+                        "
+                        :disabled="selectedIds.length !== 1"
+                        aria-label="单件 x" /></label
+                    ><label
+                      >y / 高向<input
+                        type="number"
+                        :value="selected.y"
+                        @change="
+                          setCoordinate(selected.id, 'y', $event.target.value);
+                          $event.target.value = selected.y;
+                        "
+                        :disabled="selectedIds.length !== 1"
+                        aria-label="单件 y" /></label
+                    ><label
+                      >z / 宽向<input
+                        type="number"
+                        :value="selected.z"
+                        @change="
+                          setCoordinate(selected.id, 'z', $event.target.value);
+                          $event.target.value = selected.z;
+                        "
+                        :disabled="selectedIds.length !== 1"
+                        aria-label="单件 z"
+                    /></label></div
+                ></template>
+                <div class="orientation-choices">
+                  <button
+                    v-for="(label, n) in orientationLabels"
+                    :key="n"
+                    @click="changeOrientation(n)"
+                    :disabled="!selectionAllows(n) || busy"
+                    :class="{ active: selected?.orientation === n }"
+                    :title="label"
+                  >
+                    <span v-html="thumbnail(selectedSource, n)"></span><small>{{ label }}</small>
+                  </button>
+                </div>
+                <p v-if="selected">
+                  {{ selectedSource?.noUnderstack ? "必须在组合底面。" : ""
+                  }}{{ selectedSource?.noOverstack ? "上方禁止承托其他物品。" : "" }}
+                  朝向、限层和顺序受货物属性约束。
+                </p>
+                <p v-if="!selected">在视图中点击货物选中；Ctrl 多选。</p>
+              </div>
+              <div class="prop-body" v-show="propsTab === 'check'">
+                <h6 class="prop-h">
+                  组合校验
+                  {{
+                    canCommit ? "通过" : validation.errors.length + copiesProblem.length + " 项问题"
+                  }}
+                </h6>
+                <div class="error-list">
+                  <button v-for="(e, n) in validation.errors" :key="n" @click="locateError(e)">
+                    {{ e.message }}
+                  </button>
+                  <p v-if="validation.valid" class="good">当前托检查通过。</p>
+                </div>
+                <div class="error-list" v-if="copiesProblem.length">
+                  <button
+                    v-for="(e, n) in copiesProblem"
+                    :key="'c' + n"
+                    @click="switchCopy(e.copyIndex)"
+                    :title="'点击切换到第 ' + e.copyIndex + ' 托'"
+                  >
+                    {{ e.message }}
+                  </button>
+                </div>
+                <p>
+                  外廓 {{ fmt(validation.summary.length) }} × {{ fmt(validation.summary.width) }} ×
+                  {{ fmt(validation.summary.height) }} mm
+                </p>
+                <p>
+                  几何重心 x/y/z：{{ validation.summary.center.map(fmt).join(" / ") }}
+                  mm，仅供复核。
+                </p>
+              </div>
+            </aside>
+          </div>
+          <section class="member-panel" :class="{ collapsed: !memberListOpen }">
+            <div class="panel-title">
+              <i class="ri-list-check-3" aria-hidden="true"></i>逐件装配清单
+              <span
+                >托 {{ currentCopy }} · {{ viewMembers.length }} 件{{
+                  copyCustomized ? " · 单独布局" : ""
+                }}</span
+              ><button
+                data-testid="member-list-toggle"
+                @click="memberListOpen = !memberListOpen"
+                :aria-expanded="memberListOpen"
+              >
+                {{ memberListOpen ? "收起清单" : "展开清单" }}</button
+              ><button
+                v-if="memberListOpen"
+                @click="selectedIds = viewMembers.map((m) => m.id)"
+                aria-label="全选"
+              >
+                全选</button
+              ><button v-if="memberListOpen" @click="selectedIds = []">取消选择</button>
+            </div>
+            <div class="member-scroll" v-if="memberListOpen">
+              <table>
+                <thead>
+                  <tr>
+                    <th>选</th>
+                    <th>#</th>
+                    <th>货物名称</th>
+                    <th>方向</th>
+                    <th>x / 长向</th>
+                    <th>y / 高向</th>
+                    <th>z / 宽向</th>
+                    <th>实际 x×y×z</th>
+                    <th>堆叠层级</th>
+                    <th>装配次序</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(m, index) in viewMembers"
+                    :key="m.id"
+                    @click="select(m.id, $event.ctrlKey || $event.metaKey)"
+                    :class="{
+                      selected: selectedIds.includes(m.id),
+                      invalid: memberErrors(m.id).length,
+                    }"
+                    :data-member-id="m.id"
+                  >
+                    <td>
+                      <input
+                        type="checkbox"
+                        :checked="selectedIds.includes(m.id)"
+                        @click.stop
+                        @change="select(m.id, true)"
+                      />
+                    </td>
+                    <td>{{ index + 1 }}</td>
+                    <td>{{ memberSource(m)?.name || "货源丢失" }}</td>
+                    <td>{{ orientationLabels[m.orientation] }}</td>
+                    <td>{{ fmt(m.x) }}</td>
+                    <td>{{ fmt(m.y) }}</td>
+                    <td>{{ fmt(m.z) }}</td>
+                    <td>{{ dimsText(m) }}</td>
+                    <td>{{ validation.boxes.find((b) => b.id === m.id)?.level || "—" }}</td>
+                    <td>{{ validation.summary.assemblyOrder.indexOf(m.id) + 1 }}</td>
+                    <td
+                      :title="
+                        memberErrors(m.id)
+                          .map((e) => e.message)
+                          .join('\n')
+                      "
+                    >
+                      {{ memberErrors(m.id).length ? "需修正" : "就绪" }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="!viewMembers.length" class="empty">
+                从左侧按件添加货物到当前托，或用行 / 列 / 层生成规则组合。
+              </div>
+            </div>
+          </section>
+          <div class="status-line">
+            <span :class="messageKind">{{ message || "就绪" }}</span
+            ><span>{{ canCommit ? "可提交" : "存在问题，暂不能参与装载" }}</span>
+          </div>
+          <div class="busy" v-if="busy">
+            <div>
+              <b>{{ busyLabel }}</b
+              ><button @click="cancelWorker">取消后台任务</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+    <script src="vendor/vue.global.min.js"></script>
+    <script src="vendor/three.min.js"></script>
+    <script src="vendor/OrbitControls.min.js"></script>
+    <script>
+      /* Shared pure geometry/validation for main app and the independent pallet editor. */
+      const PalletGeometry = (() => {
+        const EPS = 1e-6,
+          TOL = 0.001,
+          number = (v) => typeof v === "number" && Number.isFinite(v),
+          positive = (v) => number(v) && v > EPS,
+          int = (v, min = 1) => number(v) && Number.isInteger(v) && v >= min;
+        const copy = (x) => JSON.parse(JSON.stringify(x)),
+          color = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "#5b8db8");
+        function dims(item, n) {
+          const { l, w, h } = item || {};
+          return (
+            [
+              [l, h, w],
+              [w, h, l],
+              [h, l, w],
+              [w, l, h],
+              [l, w, h],
+              [h, w, l],
+            ][Number(n)]?.map(Number) || [0, 0, 0]
+          );
+        }
+        const allowed = (it, n) => !!it && n >= 0 && n <= 5 && !!it["rot" + n];
+        function svg(it, n) {
+          const [dx, dy, dz] = dims(it, n);
+          if (![dx, dy, dz].every(positive)) return "";
+          let pts = [
+            [0, 0, 0],
+            [dx, 0, 0],
+            [dx, 0, dz],
+            [0, 0, dz],
+            [0, dy, 0],
+            [dx, dy, 0],
+            [dx, dy, dz],
+            [0, dy, dz],
+          ].map((p) => ({ x: (p[0] - p[2]) * 0.866, y: -p[1] + (p[0] + p[2]) * 0.5 }));
+          const xs = pts.map((p) => p.x),
+            ys = pts.map((p) => p.y),
+            minX = Math.min(...xs),
+            maxX = Math.max(...xs),
+            minY = Math.min(...ys),
+            maxY = Math.max(...ys),
+            s = Math.min(36 / (maxX - minX || 1), 36 / (maxY - minY || 1)),
+            ox = 25 - (minX + (maxX - minX) / 2) * s,
+            oy = 25 - (minY + (maxY - minY) / 2) * s;
+          pts = pts.map((p) => ({ x: p.x * s + ox, y: p.y * s + oy }));
+          const poly = (ids, overlay) =>
+            `<polygon points="${ids.map((i) => pts[i].x + "," + pts[i].y).join(" ")}" fill="${color(it.color)}"/><polygon points="${ids.map((i) => pts[i].x + "," + pts[i].y).join(" ")}" fill="${overlay}"/>`;
+          return `<svg viewBox="0 0 50 50" class="cargo-svg-thumb" aria-hidden="true">${poly([4, 5, 6, 7], "rgba(255,255,255,.25)")}${poly([1, 5, 6, 2], "rgba(0,0,0,.25)")}${poly([3, 7, 6, 2], "rgba(0,0,0,.1)")}</svg>`;
+        }
+        function source(m, items) {
+          return (
+            items.find((i) => i.uid === m.itemUid) || items.find((i) => i.name === m.cargoName)
+          );
+        }
+        function box(m, items) {
+          const item = source(m, items);
+          if (!item) return null;
+          const [dx, dy, dz] = dims(item, m.orientation);
+          return {
+            ...m,
+            x: Number(m.x),
+            y: Number(m.y),
+            z: Number(m.z),
+            dx,
+            dy,
+            dz,
+            item,
+            color: color(item.color),
+            cargoName: item.name,
+            level: 1,
+          };
+        }
+        const overlap = (a, b) =>
+          Math.max(0, Math.min(a.x + a.dx, b.x + b.dx) - Math.max(a.x, b.x)) *
+          Math.max(0, Math.min(a.z + a.dz, b.z + b.dz) - Math.max(a.z, b.z));
+        const collision = (a, b) =>
+          overlap(a, b) > EPS && a.y < b.y + b.dy - EPS && a.y + a.dy > b.y + EPS;
+        function validate(g, items) {
+          const errors = [],
+            add = (message, memberId = null, field = null) =>
+              errors.push({ message, memberId, field });
+          const pallet = g.pallet,
+            L = pallet ? Number(pallet.length) : Number(g.length),
+            W = pallet ? Number(pallet.width) : Number(g.width),
+            ph = pallet ? Number(pallet.thickness) : 0,
+            tare = pallet ? Number(pallet.weight) : 0;
+          if (!String(g.name || "").trim()) add("请填写组合名称");
+          if (!int(g.copies) || g.copies > 10000) add("托数必须是 1–10000 的整数");
+          if (!positive(L) || !positive(W) || !positive(g.length) || !positive(g.width))
+            add("托盘或工作区的长、宽必须大于 0");
+          if (!number(g.maxHeight) || g.maxHeight < 0) add("最大高度需不小于 0，0 表示不限制");
+          if (
+            pallet &&
+            (!positive(ph) ||
+              !number(tare) ||
+              tare < 0 ||
+              !number(pallet.maxLoad) ||
+              pallet.maxLoad < 0)
+          )
+            add("托盘厚度、自重或承载上限无效");
+          if (!Array.isArray(g.members) || !g.members.length) add("请至少选择一件货物");
+          if (g.members?.length > 500) add("每个组合最多 500 个单件，请拆分组合");
+          const boxes = [],
+            ids = new Set(),
+            counts = new Map();
+          let cargoWeight = 0;
+          for (const m of g.members || []) {
+            if (!m.id || ids.has(m.id)) add("单件编号重复或为空", m.id);
+            ids.add(m.id);
+            const it = source(m, items);
+            if (!it || it.enabled === false) {
+              add("货源不存在或已停用", m.id);
+              continue;
+            }
+            if (!allowed(it, m.orientation)) add("摆放方向未在第二步允许", m.id, "orientation");
+            const b = box(m, items);
+            if (![b.dx, b.dy, b.dz].every(positive) || !number(it.weight) || it.weight < 0) {
+              add("货物尺寸或重量无效", m.id);
+              continue;
+            }
+            if (![m.x, m.y, m.z].every((v) => number(v) && v >= -EPS))
+              add("坐标必须为不小于 0 的有效数值", m.id);
+            if (b.x + b.dx > L + EPS || b.z + b.dz > W + EPS) add("超出托盘 / 工作区边界", m.id);
+            if (g.maxHeight > 0 && b.y + b.dy + ph > g.maxHeight + EPS)
+              add("超过组合最大高度", m.id);
+            if (it.noUnderstack && b.y > EPS) add("必须置底：只能放在托盘顶面或组合底面", m.id);
+            counts.set(it.uid, (counts.get(it.uid) || 0) + 1);
+            cargoWeight += it.weight;
+            boxes.push(b);
+          }
+          if (pallet && cargoWeight > pallet.maxLoad + EPS) add("货物净重超过托盘承载上限");
+          for (const [id, count] of counts) {
+            const it = items.find((i) => i.uid === id);
+            if (!it || !int(it.qty, 0) || count * Number(g.copies) > it.qty)
+              add(`「${it?.name || id}」每托用量 × 托数超过可用库存`);
+          }
+          for (let i = 0; i < boxes.length; i++)
+            for (let j = i + 1; j < boxes.length; j++)
+              if (collision(boxes[i], boxes[j])) {
+                add(`与「${boxes[j].item.name}」发生碰撞`, boxes[i].id);
+                add(`与「${boxes[i].item.name}」发生碰撞`, boxes[j].id);
+              }
+          for (const p of boxes)
+            for (const q of boxes)
+              if (
+                p.id !== q.id &&
+                q.item.noOverstack &&
+                p.y >= q.y + q.dy - TOL &&
+                overlap(p, q) > EPS
+              )
+                add(`「${q.item.name}」不可堆叠，上方禁止放置货物`, p.id);
+          boxes.sort(
+            (a, b) => a.y - b.y || (a.item.priority || Infinity) - (b.item.priority || Infinity),
+          );
+          for (let i = 0; i < boxes.length; i++) {
+            const p = boxes[i],
+              supports = [];
+            let level = 1,
+              area = 0;
+            if (p.y > EPS) {
+              for (let j = 0; j < i; j++) {
+                const q = boxes[j];
+                if (Math.abs(q.y + q.dy - p.y) <= TOL && overlap(p, q) > EPS) {
+                  area += overlap(p, q);
+                  supports.push(q);
+                  level = Math.max(level, q.level + 1);
+                  if (q.item.noOverstack) add(`支撑货物「${q.item.name}」不可堆叠`, p.id);
+                  if (
+                    p.item.priority > 0 &&
+                    (q.item.priority === 0 || p.item.priority < q.item.priority)
+                  )
+                    add(`与支撑货物「${q.item.name}」的装载顺序冲突`, p.id);
+                }
+              }
+              if (area + EPS < p.dx * p.dz)
+                add("底面缺少同一高度的完整支撑，不允许悬空或部分悬挑", p.id);
+            }
+            p.level = level;
+            p.ceiling = Math.min(
+              p.item.maxStack || Infinity,
+              ...supports.map((q) => q.ceiling || Infinity),
+            );
+            if (level > p.ceiling) add("超过整个支撑链的堆叠限层", p.id);
+            if (p.item.maxStack > 0 && level > p.item.maxStack) add("超过本货物最多堆叠层数", p.id);
+            if (supports.some((q) => q.item.maxStack > 0 && level > q.item.maxStack))
+              add("超过支撑货物的限层", p.id);
+          }
+          const minX = pallet ? 0 : boxes.length ? Math.min(...boxes.map((b) => b.x)) : 0,
+            minZ = pallet ? 0 : boxes.length ? Math.min(...boxes.map((b) => b.z)) : 0;
+          const length = pallet ? L : Math.max(0, ...boxes.map((b) => b.x + b.dx)) - minX,
+            width = pallet ? W : Math.max(0, ...boxes.map((b) => b.z + b.dz)) - minZ,
+            height = ph + Math.max(0, ...boxes.map((b) => b.y + b.dy));
+          const yaw90Allowed = boxes.every((b) =>
+            [0, 1, 2, 3, 4, 5].some(
+              (n) =>
+                allowed(b.item, n) &&
+                dims(b.item, n).every((d, k) => Math.abs(d - [b.dz, b.dy, b.dx][k]) < EPS),
+            ),
+          );
+          const weight = cargoWeight + tare;
+          let cx = (tare * L) / 2,
+            cy = (tare * ph) / 2,
+            cz = (tare * W) / 2;
+          for (const b of boxes) {
+            cx += b.item.weight * (b.x + b.dx / 2);
+            cy += b.item.weight * (ph + b.y + b.dy / 2);
+            cz += b.item.weight * (b.z + b.dz / 2);
+          }
+          return {
+            valid: errors.length === 0,
+            errors,
+            boxes,
+            summary: {
+              stackable: boxes.every((b) => !b.item.noOverstack),
+              floorOnly: boxes.some((b) => b.item.noUnderstack),
+              length,
+              width,
+              height,
+              cargoWeight,
+              tare,
+              weight,
+              piecesPerCopy: boxes.length,
+              copies: g.copies,
+              counts: Object.fromEntries(counts),
+              yaw90Allowed,
+              center: weight > 0 ? [cx / weight, cy / weight, cz / weight] : [0, 0, 0],
+              assemblyOrder: [...boxes]
+                .sort(
+                  (a, b) =>
+                    (a.item.priority || Infinity) - (b.item.priority || Infinity) ||
+                    a.y - b.y ||
+                    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+                )
+                .map((b) => b.id),
+            },
+          };
+        }
+        function engineItems(items) {
+          const orders = [
+            ...new Set(items.map((i) => Number(i.priority)).filter((p) => p > 0)),
+          ].sort((a, b) => a - b);
+          return items.map((i) => ({
+            name: String(i.name).trim(),
+            l: Number(i.l),
+            w: Number(i.w),
+            h: Number(i.h),
+            weight: Number(i.weight),
+            qty: Number(i.qty),
+            maxStack: Number(i.maxStack) || 0,
+            priority: i.priority > 0 ? orders.length - orders.indexOf(Number(i.priority)) : 0,
+            color: color(i.color),
+            rot0: !!i.rot0,
+            rot1: !!i.rot1,
+            rot2: !!i.rot2,
+            rot3: !!i.rot3,
+            rot4: !!i.rot4,
+            rot5: !!i.rot5,
+            noOverstack: !!i.noOverstack,
+            noUnderstack: !!i.noUnderstack,
+            palletize: false,
+            palletColumns: 1,
+            palletLayers: 1,
+          }));
+        }
+        function engineGroup(g, items) {
+          const shape = (m) => {
+            const it = source(m, items);
+            return {
+              id: m.id,
+              cargoName: String(it?.name || m.cargoName || "").trim(),
+              orientation: m.orientation,
+              x: m.x,
+              y: m.y,
+              z: m.z,
+            };
+          };
+          const out = {
+            id: g.id,
+            name: g.name,
+            enabled: g.enabled !== false,
+            copies: g.copies,
+            length: g.length,
+            width: g.width,
+            maxHeight: g.maxHeight,
+            pallet: g.pallet
+              ? {
+                  length: g.pallet.length,
+                  width: g.pallet.width,
+                  thickness: g.pallet.thickness,
+                  weight: g.pallet.weight,
+                  maxLoad: g.pallet.maxLoad,
+                }
+              : null,
+            members: (g.members || []).map(shape),
+          };
+          const layouts = customCopies(g);
+          if (layouts.length)
+            out.customLayouts = Object.fromEntries(
+              layouts.map((k) => [layoutKey(k), (g.copyLayouts[layoutKey(k)] || []).map(shape)]),
+            );
+          return out;
+        }
+        function gridMembers(g, item, orientation, rows, columns, layers, makeId) {
+          const [dx, dy, dz] = dims(item, orientation),
+            members = [];
+          for (let y = 0; y < layers; y++)
+            for (let row = 0; row < rows; row++)
+              for (let col = 0; col < columns; col++)
+                members.push({
+                  id: makeId(),
+                  itemUid: item.uid,
+                  cargoName: item.name,
+                  orientation,
+                  x: col * dx,
+                  y: y * dy,
+                  z: row * dz,
+                });
+          return members;
+        }
+        // ---- 逐托（每托单独布局）共享辅助：第 1 托为模板（group.members），其余托的定制布局存放于 group.copyLayouts["k"]（k≥2 的复制序号）。 ----
+        const layoutKey = (k) => String(Math.max(2, Math.floor(Number(k) || 2)));
+        // 读取某托的成员列表；没有定制时返回模板（镜像，调用方写入前必须先物化）。
+        function copyMembers(g, k) {
+          if (!g) return [];
+          if (Number(k) > 1) {
+            const o = g.copyLayouts?.[layoutKey(k)];
+            if (Array.isArray(o)) return o;
+          }
+          return g.members || [];
+        }
+        // 拥有定制布局的托序号（2..copies 有效范围）。
+        function customCopies(g) {
+          return Object.keys(g?.copyLayouts || {})
+            .map(Number)
+            .filter((k) => Number.isInteger(k) && k >= 2 && k <= Number(g?.copies || 0))
+            .sort((a, b) => a - b);
+        }
+        // 各货物在本组合全部托中的占用合计 = 模板计数 ×（托数-定制托数）＋ 每个定制托的计数。
+        function groupSkuCounts(g, items) {
+          const totals = new Map(),
+            add = (arr, n) => {
+              for (const m of arr || []) {
+                const it = source(m, items);
+                if (it) totals.set(it.uid, (totals.get(it.uid) || 0) + n);
+              }
+            };
+          const custom = customCopies(g),
+            base = Math.max(0, Number(g?.copies || 0) - custom.length);
+          add(g?.members, base);
+          for (const k of custom) add(g.copyLayouts[layoutKey(k)], 1);
+          return totals;
+        }
+        // 校验每一托（结构规则沿用单托 validate，库存按全部托合计校核）。返回 {valid,errors:[{message,copyIndex,memberId}],copyResults:Map}
+        function validateAllCopies(g, items) {
+          const errors = [],
+            copyResults = new Map();
+          let valid = true;
+          // 模板托校验一次即可代表所有未定制托；定制托逐一校验。
+          for (const k of [1, ...customCopies(g)]) {
+            const r = validate({ ...g, copies: 1, members: copyMembers(g, k) }, items);
+            copyResults.set(k, r);
+            if (!r.valid) {
+              valid = false;
+              for (const e of r.errors)
+                errors.push({
+                  message: (k > 1 ? `第 ${k} 托：` : "") + e.message,
+                  copyIndex: k,
+                  memberId: e.memberId ?? null,
+                  field: e.field ?? null,
+                });
+            }
+          }
+          // 逐托 validate 的库存检查按单一托拷贝通过；这里按合计再校核，覆盖“模板+定制”总占用。
+          const totals = groupSkuCounts(g, items);
+          for (const [uid, n] of totals) {
+            const it = items.find((i) => i.uid === uid);
+            const qty = Number(it?.qty);
+            if (!it || !int(qty, 0) || n > qty) {
+              valid = false;
+              errors.push({
+                message: `「${it?.name || uid}」各托合计 ${n} 件超过可用库存 ${it ? qty : 0} 件`,
+                copyIndex: null,
+                memberId: null,
+                field: null,
+              });
+            }
+          }
+          return {
+            valid,
+            errors: [
+              ...new Map(
+                errors.map((e) => [e.copyIndex + "|" + (e.memberId ?? "") + "|" + e.message, e]),
+              ).values(),
+            ],
+            copyResults,
+            summary: (copyResults.get(1) || {}).summary || {},
+          };
+        }
+        return {
+          EPS,
+          TOL,
+          number,
+          positive,
+          int,
+          copy,
+          color,
+          dims,
+          allowed,
+          svg,
+          source,
+          box,
+          overlap,
+          collision,
+          validate,
+          layoutKey,
+          copyMembers,
+          customCopies,
+          groupSkuCounts,
+          validateAllCopies,
+          engineItems,
+          engineGroup,
+          gridMembers,
+        };
+      })();
+
+      /* Bounded editor movements; staging margin does not extend a physical pallet.
+   Collision-aware helpers park a selection at the last clear position instead
+   of letting boxes interpenetrate; a common delta keeps relative positions. */
+      const PalletMotion = (() => {
+        const finite = (v) => typeof v === "number" && Number.isFinite(v);
+        const EPS = 1e-6;
+        function region(group, items) {
+          const d = group.pallet || group,
+            positive = (v) => (finite(v) && v > 0 ? Math.min(v, 1e7) : 1);
+          const length = positive(d.length),
+            width = positive(d.width);
+          const thickness = group.pallet ? positive(group.pallet.thickness) : 0;
+          const tallest = Math.max(
+            1,
+            ...(group.members || [])
+              .map((m) => PalletGeometry.dims(PalletGeometry.source(m, items), m.orientation)[1])
+              .filter(finite),
+          );
+          const physicalHeight =
+            finite(group.maxHeight) && group.maxHeight > 0
+              ? Math.max(0, group.maxHeight - thickness)
+              : Math.max(2500, tallest * 5);
+          const margin = Math.max(100, Math.min(500, Math.max(length, width) * 0.1));
+          return {
+            length,
+            width,
+            physicalHeight,
+            thickness,
+            margin,
+            x: length + margin,
+            y: physicalHeight + margin,
+            z: width + margin,
+          };
+        }
+        function clampDelta(group, items, origins, requested) {
+          const bounds = region(group, items),
+            axes = ["x", "y", "z"];
+          const result = {
+            x: requested.x || 0,
+            y: requested.y || 0,
+            z: requested.z || 0,
+            limited: false,
+          };
+          for (let n = 0; n < 3; n++) {
+            const axis = axes[n];
+            let min = -Infinity,
+              max = Infinity;
+            for (const origin of origins) {
+              const member = group.members.find((m) => m.id === origin.id);
+              if (!member) continue;
+              const size = PalletGeometry.dims(
+                PalletGeometry.source(member, items),
+                member.orientation,
+              )[n];
+              min = Math.max(min, -origin[axis]);
+              max = Math.min(
+                max,
+                Math.max(0, bounds[axis] - (finite(size) ? size : 0)) - origin[axis],
+              );
+            }
+            const want = result[axis];
+            if (!finite(want)) result[axis] = 0;
+            else result[axis] = min <= max ? Math.min(max, Math.max(min, want)) : 0;
+            if (Math.abs(result[axis] - want) > 1e-6) result.limited = true;
+          }
+          return result;
+        }
+        function sceneBoxes(group, items, excludeIds) {
+          return (group.members || [])
+            .filter((m) => !excludeIds.has(m.id))
+            .map((m) => PalletGeometry.box(m, items))
+            .filter(Boolean);
+        }
+        function intersectsScene(memberBox, scene, x, y, z) {
+          return scene.some(
+            (s) =>
+              x < s.x + s.dx - EPS &&
+              x + memberBox.dx > s.x + EPS &&
+              z < s.z + s.dz - EPS &&
+              z + memberBox.dz > s.z + EPS &&
+              y < s.y + s.dy - EPS &&
+              y + memberBox.dy > s.y + EPS,
+          );
+        }
+        function anyCollision(group, items, origins, excludeUnselected = true) {
+          const sel = new Set(origins.map((o) => o.id));
+          const scene = sceneBoxes(group, items, excludeUnselected ? sel : new Set());
+          return origins.some((o) => {
+            const m = group.members.find((x) => x.id === o.id);
+            if (!m) return false;
+            const box = PalletGeometry.box(m, items);
+            if (!box) return false;
+            return intersectsScene(box, scene, m.x, m.y, m.z);
+          });
+        }
+        /* Largest t in [0,1] along `requested` that keeps every origin clear of the
+     unselected scene. Touching faces (t at the boundary) is allowed. */
+        function closestCollisionDelta(group, items, origins, requested) {
+          const sel = new Set(origins.map((o) => o.id));
+          const scene = sceneBoxes(group, items, sel);
+          const clear = (t) =>
+            origins.every((o) => {
+              const m = group.members.find((x) => x.id === o.id);
+              if (!m) return true;
+              const box = PalletGeometry.box(m, items);
+              if (!box) return true;
+              return !intersectsScene(
+                box,
+                scene,
+                o.x + (requested.x || 0) * t,
+                o.y + (requested.y || 0) * t,
+                o.z + (requested.z || 0) * t,
+              );
+            });
+          if (clear(1))
+            return {
+              x: requested.x || 0,
+              y: requested.y || 0,
+              z: requested.z || 0,
+              traveled: true,
+              blocked: false,
+            };
+          if (!clear(0)) return { x: 0, y: 0, z: 0, traveled: false, blocked: true };
+          let lo = 0,
+            hi = 1;
+          for (let i = 0; i < 42; i++) {
+            const mid = (lo + hi) / 2;
+            clear(mid) ? (lo = mid) : (hi = mid);
+          }
+          const len = Math.hypot(requested.x || 0, requested.y || 0, requested.z || 0) || 1;
+          const t = Math.max(0, lo - 1e-6 / len);
+          // Sub-visible parking begins again from the same contact face on the next
+          // push; treat it as not moved so repeated attempts do not drift.
+          if (t <= 1e-4) return { x: 0, y: 0, z: 0, traveled: false, blocked: true };
+          return {
+            x: (requested.x || 0) * t,
+            y: (requested.y || 0) * t,
+            z: (requested.z || 0) * t,
+            traveled: true,
+            blocked: true,
+          };
+        }
+        const maxSafeDelta = closestCollisionDelta;
+        /* Park at the closest reachable point; slide the leftover along its dominant
+     perpendicular axis when the straight path is blocked, so dragging around a
+     box still feels continuous. Never moves through other cargo. */
+        function tryDelta(group, items, origins, requested) {
+          const primary = closestCollisionDelta(group, items, origins, requested);
+          const rest = {
+            x: (requested.x || 0) - primary.x,
+            y: (requested.y || 0) - primary.y,
+            z: (requested.z || 0) - primary.z,
+          };
+          if (primary.blocked && Math.hypot(rest.x, rest.y, rest.z) > EPS) {
+            const shifted = origins.map((o) => ({
+              id: o.id,
+              x: o.x + primary.x,
+              y: o.y + primary.y,
+              z: o.z + primary.z,
+            }));
+            const axes = Object.entries(rest)
+              .filter(([, v]) => Math.abs(v) > EPS)
+              .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+            for (const [axis, value] of axes) {
+              const slide = closestCollisionDelta(group, items, shifted, { [axis]: value });
+              if (slide.traveled) {
+                const merged = { x: primary.x, y: primary.y, z: primary.z };
+                merged[axis] += slide[axis];
+                return { ...merged, traveled: true, blocked: true };
+              }
+            }
+          }
+          return primary;
+        }
+        return {
+          region,
+          clampDelta,
+          closestCollisionDelta,
+          maxSafeDelta,
+          tryDelta,
+          anyCollision,
+          intersectsScene,
+        };
+      })();
+
+      /* Visual-only, four-way wooden pallet. All parts stay within the supplied envelope.
+   The solver still reserves length × width × thickness and uses the entered tare/load. */
+      function palletVisualParts(length, thickness, width, yaw90 = false) {
+        const L = Number(yaw90 ? width : length),
+          W = Number(yaw90 ? length : width),
+          H = Number(thickness);
+        if (![L, W, H].every((v) => Number.isFinite(v) && v > 0)) return [];
+        const parts = [],
+          bottom = H * 0.14,
+          block = H * 0.56,
+          bearer = H * 0.12,
+          deck = H - bottom - block - bearer;
+        const bx = L * 0.14,
+          bz = W * 0.16,
+          xs = [bx / 2, L / 2, L - bx / 2],
+          zs = [bz / 2, W / 2, W - bz / 2];
+        const add = (role, x, y, z, dx, dy, dz, tone) =>
+          parts.push({ role, x, y, z, dx, dy, dz, tone });
+        for (const z of zs) add("bottom-runner", 0, 0, z - bz / 2, L, bottom, bz, -7);
+        for (const x of xs)
+          for (const z of zs)
+            add("support-block", x - bx / 2, bottom, z - bz / 2, bx, block, bz, -12);
+        for (const x of xs) add("cross-bearer", x - bx / 2, bottom + block, 0, bx, bearer, W, -3);
+        const gap = W * 0.022,
+          plank = (W - gap * 4) / 5;
+        for (let k = 0; k < 5; k++)
+          add("deck-board", 0, H - deck, k * (plank + gap), L, deck, plank, k % 2 ? 6 : 0);
+        if (yaw90)
+          return parts.map((p) => ({ ...p, x: p.z, z: L - p.x - p.dx, dx: p.dz, dz: p.dx }));
+        return parts;
+      }
+      let palletGrainTexture = null;
+      function getPalletGrainTexture() {
+        if (palletGrainTexture) return palletGrainTexture;
+        const canvas =
+          typeof document !== "undefined"
+            ? document.createElement("canvas")
+            : new OffscreenCanvas(256, 64);
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#bb976a";
+        ctx.fillRect(0, 0, 256, 64);
+        for (let row = 0; row < 47; row++) {
+          const y = row * 1.37;
+          ctx.strokeStyle = row % 3 ? "rgba(87,58,29,.12)" : "rgba(244,219,177,.20)";
+          ctx.lineWidth = row % 5 === 0 ? 0.8 : 0.35;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          for (let x = 0; x <= 256; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.032 + row) * 0.7);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "rgba(85,58,32,.22)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.ellipse(174, 37, 16, 2.3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        palletGrainTexture = new THREE.CanvasTexture(canvas);
+        palletGrainTexture.encoding = THREE.sRGBEncoding;
+        palletGrainTexture.wrapS = palletGrainTexture.wrapT = THREE.RepeatWrapping;
+        return palletGrainTexture;
+      }
+      function createPalletVisual(
+        length,
+        thickness,
+        width,
+        { yaw90 = false, swapAxes = false, highlighted = true } = {},
+      ) {
+        const parts = palletVisualParts(length, thickness, width, yaw90),
+          group = new THREE.Group();
+        group.userData.palletStructure = {
+          length: Number(length),
+          width: Number(width),
+          thickness: Number(thickness),
+          parts,
+        };
+        if (!parts.length) return group;
+        const positions = [],
+          normals = [],
+          uvs = [],
+          colors = [];
+        for (const p of parts) {
+          const box = new THREE.BoxGeometry(p.dx, p.dy, p.dz),
+            geo = box.toNonIndexed();
+          geo.translate(p.x + p.dx / 2 - length / 2, p.y + p.dy / 2, p.z + p.dz / 2 - width / 2);
+          const rgb = new THREE.Color(highlighted ? 0xffffff : 0xe0d6c7).multiplyScalar(
+              1 + p.tone / 110,
+            ),
+            count = geo.attributes.position.count;
+          positions.push(...geo.attributes.position.array);
+          normals.push(...geo.attributes.normal.array);
+          uvs.push(...geo.attributes.uv.array);
+          for (let n = 0; n < count; n++) colors.push(rgb.r, rgb.g, rgb.b);
+          geo.dispose();
+          box.dispose();
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+        geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+        const wood = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            map: getPalletGrainTexture(),
+            vertexColors: true,
+            roughness: 0.9,
+            metalness: 0,
+          }),
+        );
+        wood.name = "wooden-pallet-structure";
+        group.add(wood);
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geometry),
+          new THREE.LineBasicMaterial({
+            color: 0x765737,
+            transparent: true,
+            opacity: highlighted ? 0.38 : 0.24,
+          }),
+        );
+        edges.name = "pallet-board-edges";
+        group.add(edges);
+        if (swapAxes) {
+          group.rotation.y = Math.PI / 2;
+          group.scale.x = -1;
+        }
+        return group;
+      }
+
+      /* Canvas compatibility renderer. It uses the same real placements as WebGL. */
+      function drawPackingDiagram(
+        ctx,
+        width,
+        height,
+        result,
+        placed,
+        mode = "iso",
+        currentIndices = null,
+        showDimensions = false,
+        grayPrevious = false,
+      ) {
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "#f8faf7";
+        ctx.fillRect(0, 0, width, height);
+        if (!result) return [];
+        const L = Number(result.containerLength),
+          W = Number(result.containerWidth),
+          H = Number(result.containerHeight);
+        if (![L, W, H].every((v) => v > 0)) return [];
+        const project = (x, y, z) =>
+          mode === "front"
+            ? [z, -y]
+            : mode === "side"
+              ? [x, -y]
+              : mode === "top"
+                ? [x, z]
+                : [(x - z) * 0.82, (x + z) * 0.29 - y];
+        const corners = [
+          [0, 0, 0],
+          [L, 0, 0],
+          [L, 0, W],
+          [0, 0, W],
+          [0, H, 0],
+          [L, H, 0],
+          [L, H, W],
+          [0, H, W],
+        ];
+        /* v5.0：完整装载图外框绘制开着的尾门（仅报告 iso 全景，两级投影外沿纳入取景）。 */
+        const doorPoints =
+          showDimensions && mode === "iso"
+            ? [
+                [(-Math.sqrt(3) * W) / 4, 0, -W / 4],
+                [(-Math.sqrt(3) * W) / 4, H, -W / 4],
+                [(-Math.sqrt(3) * W) / 4, 0, W * 1.25],
+                [(-Math.sqrt(3) * W) / 4, H, W * 1.25],
+              ]
+            : [];
+        const raw = corners.concat(doorPoints).map((p) => project(...p));
+        const xs = raw.map((p) => p[0]),
+          ys = raw.map((p) => p[1]),
+          minX = Math.min(...xs),
+          maxX = Math.max(...xs),
+          minY = Math.min(...ys),
+          maxY = Math.max(...ys);
+        const margin = Math.min(width, height) * 0.075,
+          extra = showDimensions ? 26 : 10,
+          scale = Math.min(
+            (width - margin * 2) / (maxX - minX || 1),
+            (height - margin * 2 - extra) / (maxY - minY || 1),
+          );
+        const ox = (width - (maxX - minX) * scale) / 2 - minX * scale,
+          oy = (height - extra - (maxY - minY) * scale) / 2 - minY * scale;
+        const p = (x, y, z) => {
+          const v = project(x, y, z);
+          return [v[0] * scale + ox, v[1] * scale + oy];
+        };
+        const polygon = (pts, fill, stroke = "#506e83", line = 1) => {
+          ctx.beginPath();
+          pts.forEach((v, i) => (i ? ctx.lineTo(...v) : ctx.moveTo(...v)));
+          ctx.closePath();
+          if (fill) {
+            ctx.fillStyle = fill;
+            ctx.fill();
+          }
+          if (stroke) {
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = line;
+            ctx.stroke();
+          }
+        };
+        const shade = (hex, amount) => {
+          const str = /^#[\da-f]{6}$/i.test(hex) ? hex : "#5b8db8";
+          const n = parseInt(str.slice(1), 16),
+            adjust = (c) => Math.max(0, Math.min(255, Math.round(c + amount)));
+          return `rgb(${adjust(n >> 16)},${adjust((n >> 8) & 255)},${adjust(n & 255)})`;
+        };
+        const frame = corners.map((v) => p(...v));
+        ctx.strokeStyle = "#a3b7bf";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 4]);
+        for (const [a, b] of [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 0],
+          [4, 5],
+          [5, 6],
+          [6, 7],
+          [7, 4],
+          [0, 4],
+          [1, 5],
+          [2, 6],
+          [3, 7],
+        ]) {
+          ctx.beginPath();
+          ctx.moveTo(...frame[a]);
+          ctx.lineTo(...frame[b]);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        if (doorPoints.length) {
+          for (const [z, free] of [
+            [0, [(-Math.sqrt(3) * W) / 4, -W / 4]],
+            [W, [(-Math.sqrt(3) * W) / 4, W * 1.25]],
+          ]) {
+            const [fx, fz] = free,
+              quad = [p(0, 0, z), p(fx, 0, fz), p(fx, H, fz), p(0, H, z)];
+            polygon(quad, "#e9f0f4", "#627f93", Math.max(0.6, width / 1800));
+            ctx.strokeStyle = "#4a6c81";
+            ctx.lineWidth = Math.max(0.55, width / 2200);
+            for (const t of [0.35, 0.7]) {
+              ctx.beginPath();
+              ctx.moveTo(
+                quad[0][0] + (quad[1][0] - quad[0][0]) * t,
+                quad[0][1] + (quad[1][1] - quad[0][1]) * t,
+              );
+              ctx.lineTo(
+                quad[3][0] + (quad[2][0] - quad[3][0]) * t,
+                quad[3][1] + (quad[2][1] - quad[3][1]) * t,
+              );
+              ctx.stroke();
+            }
+          }
+        }
+        const bases = (result.palletBases || [])
+          .filter((b) => b.editorPreview || b.firstItemIndex < (placed || []).length)
+          .flatMap((b) => {
+            const unit = (result.palletUnits || []).find((u) => u.id === b.id);
+            return palletVisualParts(b.dx, b.dy, b.dz, !!unit?.yaw90).map((part) => ({
+              it: {
+                ...part,
+                x: b.x + part.x,
+                y: b.y + part.y,
+                z: b.z + part.z,
+                color:
+                  part.role === "support-block"
+                    ? "#a48255"
+                    : part.role === "bottom-runner"
+                      ? "#ab8a60"
+                      : "#bc996c",
+                isPalletBase: true,
+              },
+              index: b.firstItemIndex,
+            }));
+          });
+        // Physical pallet bases are below every cargo piece: draw them before cargo.
+        // Sorting long deck boards together with small cartons can paint the boards over the load.
+        const depth = (a, b) =>
+          mode === "front"
+            ? a.it.x - b.it.x
+            : mode === "side"
+              ? a.it.z - b.it.z
+              : mode === "top"
+                ? a.it.y - b.it.y
+                : a.it.x + a.it.z + a.it.y * 0.05 - (b.it.x + b.it.z + b.it.y * 0.05);
+        const hits = [],
+          ordered = [
+            ...bases.sort((a, b) => a.it.y - b.it.y || depth(a, b)),
+            ...(placed || []).map((it, index) => ({ it, index })).sort(depth),
+          ];
+        for (const { it, index } of ordered) {
+          const x = it.x,
+            y = it.y,
+            z = it.z,
+            dx = it.dx,
+            dy = it.dy,
+            dz = it.dz,
+            pts = [
+              [x, y, z],
+              [x + dx, y, z],
+              [x + dx, y, z + dz],
+              [x, y, z + dz],
+              [x, y + dy, z],
+              [x + dx, y + dy, z],
+              [x + dx, y + dy, z + dz],
+              [x, y + dy, z + dz],
+            ].map((v) => p(...v));
+          const highlighted = !currentIndices || currentIndices.has(index),
+            color = grayPrevious && !highlighted ? "#cad4d8" : it.color || "#5b8db8";
+          let faces;
+          if (mode === "front") faces = [[1, 5, 6, 2]];
+          else if (mode === "side") faces = [[2, 6, 7, 3]];
+          else if (mode === "top") faces = [[4, 5, 6, 7]];
+          else
+            faces = [
+              [1, 5, 6, 2],
+              [3, 7, 6, 2],
+              [4, 5, 6, 7],
+            ];
+          faces.forEach((ids, i) => {
+            const vertices = ids.map((id) => pts[id]);
+            polygon(
+              vertices,
+              shade(color, mode === "iso" ? (i === 0 ? -12 : i === 1 ? -26 : 18) : 6),
+              highlighted ? "#4f6e84" : "#9aacb8",
+              Math.max(0.55, width / 1400),
+            );
+            if (!it.isPalletBase) hits.push({ item: it, points: vertices });
+          });
+          if (highlighted && !it.isPalletBase) {
+            const face = faces[faces.length - 1].map((id) => pts[id]),
+              fx = face.map((v) => v[0]),
+              fy = face.map((v) => v[1]),
+              fw = Math.max(...fx) - Math.min(...fx),
+              fh = Math.max(...fy) - Math.min(...fy);
+            if (fw > 38 && fh > 17) {
+              ctx.save();
+              ctx.font = `${Math.max(9, Math.min(16, width / 90))}px ClassicCN, sans-serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillStyle = "#23445b";
+              const name = String(it.cargoName || it.name || "").replace(/\s*\[Pallet\]$/, "");
+              let label = name;
+              while (label.length > 1 && ctx.measureText(label).width > fw * 0.77)
+                label = label.slice(0, -1);
+              if (label !== name) label += "…";
+              ctx.strokeStyle = "#ffffffbb";
+              ctx.lineWidth = 2;
+              const tx = (Math.max(...fx) + Math.min(...fx)) / 2,
+                ty = (Math.max(...fy) + Math.min(...fy)) / 2;
+              ctx.strokeText(label, tx, ty);
+              ctx.fillText(label, tx, ty);
+              ctx.restore();
+            }
+          }
+        }
+        if (showDimensions) {
+          ctx.font = `${Math.max(10, Math.min(22, width / 80))}px ClassicCN, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#57788c";
+          ctx.fillText(`内长 ${L} × 内宽 ${W} × 内高 ${H} mm`, width / 2, height - margin * 0.35);
+        }
+        return hits;
+      }
+
+      /* Decorative application icons supplied by the user as local PNG files. */
+      const AppIcon = {
+        props: { name: { type: String, required: true } },
+        template: `<img class="icon" :src="'icons/' + name + '.png'" alt="" aria-hidden="true" draggable="false" @error="onImageError" @load="onImageLoad">`,
+        methods: {
+          // No generated SVG, emoji or replacement image when a PNG is not present.
+          // Keep the layout slot while allowing the text/command to remain usable.
+          onImageError(event) {
+            event.target.style.visibility = "hidden";
+          },
+          onImageLoad(event) {
+            event.target.style.visibility = "";
+          },
+        },
+      };
+
+      const { createApp, ref, computed, watch, nextTick, onMounted } = Vue;
+      THREE.ColorManagement.legacyMode = false;
+      const palletEditorApp = createApp({
+        components: { AppIcon },
+        setup() {
+          const group = ref(null),
+            items = ref([]),
+            initialized = ref(false),
+            sourceId = ref(null),
+            search = ref(""),
+            addQuantity = ref(1),
+            selectedIds = ref([]),
+            tool = ref("move"),
+            view = ref("iso"),
+            snap = ref(10),
+            magnet = ref(true),
+            viewport = ref(null),
+            fallback = ref(false),
+            message = ref(""),
+            messageKind = ref(""),
+            busy = ref(false),
+            busyLabel = ref(""),
+            memberListOpen = ref(false);
+          const EPS = 1e-6;
+          const history = ref([]),
+            historyIndex = ref(-1),
+            fmt = (n) =>
+              Number.isFinite(Number(n))
+                ? Number(n).toLocaleString("zh-CN", { maximumFractionDigits: 2 })
+                : "—";
+          const views = [
+              { key: "iso", label: "3D 等距" },
+              { key: "front", label: "长端" },
+              { key: "side", label: "侧面" },
+              { key: "top", label: "俯视" },
+            ],
+            orientationLabels = [
+              "平放 0°",
+              "平放 90°",
+              "侧立 0°",
+              "侧立 90°",
+              "侧翻 0°",
+              "侧翻 90°",
+            ];
+          let channel = "",
+            wasmBuffer = null,
+            workerSource = "",
+            worker = null,
+            workerUrl = null,
+            rejectJob = null,
+            jobSerial = 0,
+            renderer = null,
+            scene = null,
+            camera = null,
+            ortho = null,
+            controls = null,
+            meshGroup = null,
+            palletVisual = null,
+            raycaster = null,
+            pointer = null,
+            drag = null,
+            raf = 0,
+            observer = null,
+            canvas = null,
+            fallbackHits = [],
+            restore = false,
+            drawPending = false,
+            historyTimer = null,
+            frameSignature = "",
+            meshCache = new Map();
+          const makeId = () =>
+            `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+          // ---- 逐托：第 1 托为模板（group.members），第 2..N 托可在 copyLayouts["k"] 单独布局 ----
+          const currentCopy = ref(1);
+          // v4.9：左右抽屉面板与参数选项卡状态；小屏默认收起两侧
+          const sourcesOpen = ref(true),
+            propsOpen = ref(true),
+            propsTab = ref("pallet");
+          try {
+            if (typeof matchMedia === "function" && matchMedia("(max-width:1170px)").matches) {
+              sourcesOpen.value = false;
+              propsOpen.value = false;
+            }
+          } catch (e) {}
+          const currentLayout = () =>
+            currentCopy.value > 1
+              ? group.value?.copyLayouts?.[String(currentCopy.value)] || null
+              : null;
+          const viewMembers = computed(() => currentLayout() || group.value?.members || []);
+          const copyCustomized = computed(() => !!currentLayout());
+          const customCopyCount = computed(() =>
+            group.value ? PalletGeometry.customCopies(group.value).length : 0,
+          );
+          function mutableMembers() {
+            if (!group.value) return [];
+            if (currentCopy.value === 1) return group.value.members;
+            if (!group.value.copyLayouts) group.value.copyLayouts = {};
+            const k = String(currentCopy.value);
+            if (!group.value.copyLayouts[k])
+              group.value.copyLayouts[k] = PalletGeometry.copy(group.value.members);
+            return group.value.copyLayouts[k];
+          }
+          function replaceMembers(arr) {
+            if (!group.value) return;
+            if (currentCopy.value === 1) group.value.members = arr;
+            else {
+              if (!group.value.copyLayouts) group.value.copyLayouts = {};
+              group.value.copyLayouts[String(currentCopy.value)] = arr;
+            }
+          }
+          function layoutScope() {
+            return { ...group.value, members: mutableMembers(), copies: 1 };
+          }
+          function switchCopy(k) {
+            if (!group.value) return;
+            k = Math.max(
+              1,
+              Math.min(Math.floor(Number(k) || 1), Math.floor(group.value.copies) || 1),
+            );
+            if (k === currentCopy.value) return;
+            currentCopy.value = k;
+            selectedIds.value = [];
+          }
+          function syncCopies() {
+            if (!group.value) return;
+            group.value.copies = Math.max(
+              1,
+              Math.min(10000, Math.floor(Number(group.value.copies) || 1)),
+            );
+            if (group.value.copyLayouts)
+              for (const k of Object.keys(group.value.copyLayouts))
+                if (Number(k) > group.value.copies) delete group.value.copyLayouts[k];
+            if (currentCopy.value > group.value.copies) currentCopy.value = group.value.copies;
+          }
+          function resetCopyToTemplate() {
+            if (!group.value || currentCopy.value <= 1 || !currentLayout()) return;
+            checkpoint();
+            delete group.value.copyLayouts[String(currentCopy.value)];
+            selectedIds.value = [];
+            checkpoint();
+            notify("本托已恢复为模板布局（跟随模板出货）。");
+          }
+          // 全组合（模板+所有单独布局托）的货物占用合计与复用余量
+          const groupUsage = computed(() =>
+            group.value ? PalletGeometry.groupSkuCounts(group.value, items.value) : new Map(),
+          );
+          const reuseInfo = computed(() => {
+            if (!group.value) return { maxAdd: 0 };
+            let max = Math.max(0, 10000 - (Math.floor(group.value.copies) || 1));
+            const needs = new Map();
+            for (const m of group.value.members || []) {
+              const it = PalletGeometry.source(m, items.value);
+              if (it) needs.set(it.uid, (needs.get(it.uid) || 0) + 1);
+            }
+            for (const [uid, n] of needs) {
+              if (n <= 0) continue;
+              const it = items.value.find((i) => i.uid === uid);
+              const left = Math.max(0, Number(it?.qty || 0) - (groupUsage.value.get(uid) || 0));
+              max = Math.min(max, Math.floor(left / n));
+            }
+            return { maxAdd: (group.value.members || []).length ? max : 0 };
+          });
+          function editorReuse(mode) {
+            if (busy.value || !group.value) return;
+            if (!(group.value.members || []).length)
+              return notify("组合为空，请先为模板托加入货物再复用。", "error");
+            const info = reuseInfo.value,
+              add = mode === "fill" ? info.maxAdd : Math.min(1, info.maxAdd);
+            if (add < 1) return notify("按各托实际用量预留后库存不足，无法再复用。", "error");
+            checkpoint();
+            group.value.copies = Math.min(10000, group.value.copies + add);
+            syncCopies();
+            checkpoint();
+            notify(
+              add > 1
+                ? `已按模板复用 ${add} 托，共 ${group.value.copies} 托；用 ◀ ▶ 切换到某托后可单独调整。`
+                : "已按模板复用 1 托；用 ◀ ▶ 切换到某托后可单独调整。",
+            );
+          }
+          const chosenSource = computed(
+              () => items.value.find((i) => i.uid === sourceId.value) || null,
+            ),
+            filteredItems = computed(() =>
+              items.value.filter(
+                (i) => !search.value || i.name.toLowerCase().includes(search.value.toLowerCase()),
+              ),
+            );
+          const selected = computed(
+              () => viewMembers.value.find((m) => m.id === selectedIds.value[0]) || null,
+            ),
+            selectedSource = computed(() =>
+              selected.value ? PalletGeometry.source(selected.value, items.value) : null,
+            );
+          const counts = computed(() => {
+            const map = new Map();
+            for (const m of viewMembers.value) {
+              const it = PalletGeometry.source(m, items.value);
+              if (it) map.set(it.uid, (map.get(it.uid) || 0) + 1);
+            }
+            return map;
+          });
+          // 当前托的结构校验（库存按单托口径）；合并全托合计的库存错误；
+          // 其它托的结构问题单独列出，保存参与前必须全部通过。
+          const allCopiesCheck = computed(() =>
+            group.value
+              ? PalletGeometry.validateAllCopies(group.value, items.value)
+              : { valid: false, errors: [], copyResults: new Map() },
+          );
+          const validation = computed(() => {
+            if (!group.value) return { valid: false, errors: [], boxes: [], summary: {} };
+            const local = PalletGeometry.validate(
+              { ...group.value, copies: 1, members: viewMembers.value },
+              items.value,
+            );
+            const stock = allCopiesCheck.value.errors
+              .filter((e) => e.copyIndex == null)
+              .filter((e) => !local.errors.some((x) => x.message === e.message));
+            return {
+              ...local,
+              errors: [...local.errors, ...stock],
+              valid: local.valid && !stock.length,
+            };
+          });
+          const copiesProblem = computed(() =>
+            allCopiesCheck.value.errors.filter(
+              (e) => e.copyIndex != null && e.copyIndex !== currentCopy.value,
+            ),
+          );
+          const canCommit = computed(() => validation.value.valid && !copiesProblem.value.length);
+          const hasBoard = computed({
+            get: () => !!group.value?.pallet,
+            set: (value) => {
+              if (value) {
+                group.value.pallet = {
+                  length: group.value.length,
+                  width: group.value.width,
+                  thickness: 120,
+                  weight: 20,
+                  maxLoad: 1000,
+                };
+              } else {
+                group.value.length = group.value.pallet.length;
+                group.value.width = group.value.pallet.width;
+                group.value.pallet = null;
+              }
+            },
+          });
+          const dimensions = computed(() => group.value.pallet || group.value);
+          const motionRegion = computed(() =>
+            group.value ? PalletMotion.region(group.value, items.value) : null,
+          );
+          function selectionOrigins() {
+            return mutableMembers()
+              .filter((m) => selectedIds.value.includes(m.id))
+              .map((m) => ({ id: m.id, x: m.x, y: m.y, z: m.z }));
+          }
+          function forbiddenKeys(check) {
+            return new Set(
+              check.errors
+                .filter((e) => e.message.includes("不可堆叠") || e.message.includes("必须置底"))
+                .map((e) => `${e.memberId}:${e.message}`),
+            );
+          }
+          function translateSelection(requested, origins = selectionOrigins()) {
+            if (busy.value || !origins.length) return false;
+            const speak = (text) => {
+              if (drag) {
+                drag.note = drag.note || text;
+                return;
+              }
+              notify(text, "error");
+            };
+            const previous = mutableMembers().map((m) => ({ ...m })),
+              before = forbiddenKeys(validation.value);
+            const moved = PalletMotion.tryDelta(layoutScope(), items.value, origins, requested);
+            if (
+              Math.hypot(requested.x || 0, requested.y || 0, requested.z || 0) > EPS &&
+              !moved.traveled
+            ) {
+              speak("被其他货物阻挡，位置未改变。");
+              return false;
+            }
+            const final = PalletMotion.clampDelta(layoutScope(), items.value, origins, moved);
+            for (const old of origins) {
+              const m = mutableMembers().find((m) => m.id === old.id);
+              if (m) for (const axis of ["x", "y", "z"]) m[axis] = old[axis] + final[axis];
+            }
+            const denied = [...forbiddenKeys(validation.value)].find((key) => !before.has(key));
+            const overlaps = PalletMotion.anyCollision(layoutScope(), items.value, origins);
+            if (denied || overlaps) {
+              replaceMembers(previous);
+              speak(
+                denied
+                  ? denied.split(":").slice(1).join(":")
+                  : "该位置会与现有货物碰撞，操作已取消。",
+              );
+              queueDraw();
+              return false;
+            }
+            if (final.limited) speak("已限制在移动安全区域；超出实体托盘的冗余区仍需修正后提交。");
+            else if (moved.blocked) speak("已停在最近的可通行位置，未穿过其他货物。");
+            queueDraw();
+            return true;
+          }
+          function moveSelection(axis, distance) {
+            if (busy.value || !selectedIds.value.length || !["x", "y", "z"].includes(axis)) return;
+            checkpoint();
+            translateSelection({ [axis]: distance });
+            checkpoint();
+          }
+          function setCoordinate(id, axis, raw) {
+            if (busy.value) return;
+            const m = mutableMembers().find((m) => m.id === id),
+              v = Number(raw);
+            if (!m || raw === "" || !Number.isFinite(v)) {
+              notify("坐标必须为有效数值。", "error");
+              return;
+            }
+            checkpoint();
+            translateSelection({ [axis]: v - m[axis] }, [{ id: m.id, x: m.x, y: m.y, z: m.z }]);
+            checkpoint();
+          }
+          function candidatePlace(id, x, y, z) {
+            const g = group.value,
+              m = mutableMembers().find((q) => q.id === id),
+              it = memberSource(m);
+            if (!m || !it) return null;
+            const key = (e) => `${e.memberId}:${e.message}`,
+              baseKeys = new Set(validation.value.errors.map(key));
+            const others = mutableMembers().filter((q) => q.id !== id),
+              candidate = { ...m, x, y, z };
+            const errors = PalletGeometry.validate(
+              { ...g, copies: 1, members: [...others, candidate] },
+              items.value,
+            ).errors;
+            if (errors.some((e) => e.memberId === id || !baseKeys.has(key(e)))) return null;
+            const [dx, dy, dz] = PalletGeometry.dims(it, m.orientation),
+              scene = others.map((q) => PalletGeometry.box(q, items.value)).filter(Boolean);
+            return PalletMotion.intersectsScene({ x, y, z, dx, dy, dz }, scene, x, y, z)
+              ? null
+              : candidate;
+          }
+          function moveLayer(direction) {
+            if (busy.value || !selected.value || !selectedIds.value.length) return;
+            const selectedSet = new Set(selectedIds.value),
+              origins = selectionOrigins(),
+              base = Math.min(...origins.map((m) => m.y));
+            const sceneBoxes = validation.value.boxes.filter((b) => !selectedSet.has(b.id));
+            const tops = [0, ...sceneBoxes.map((b) => b.y + b.dy)]
+              .filter(Number.isFinite)
+              .sort((a, b) => a - b);
+            const [dx, dy, dz] = PalletGeometry.dims(
+                selectedSource.value,
+                selected.value.orientation,
+              ),
+              own = Math.max(1, dy || 1);
+            const next =
+              direction > 0
+                ? (tops.find((y) => y > base + 0.001) ?? base + own)
+                : ([0, ...tops.filter((y) => y < base - 0.001)].pop() ?? Math.max(0, base - own));
+            checkpoint();
+            let changed = false;
+            // Keep any rule explanation spoken by the straight move so a failed
+            // shelf-search can echo the real cause (e.g. 必须置底) to the user.
+            const messageBefore = message.value;
+            let hint = "";
+            if (selectedIds.value.length === 1) {
+              // Phase one: straight raise/lower. It only counts when the member lands
+              // without problems of its own (a floated stage from a free path is
+              // rolled back so the shelf-search below can try lateral spots).
+              const moved = translateSelection({ y: next - base }, origins);
+              if (message.value !== messageBefore) hint = message.value;
+              if (moved && !validation.value.errors.some((e) => e.memberId === selected.value.id))
+                changed = true;
+              else {
+                for (const old of origins) {
+                  const kept = mutableMembers().find((q) => q.id === old.id);
+                  if (kept) {
+                    kept.x = old.x;
+                    kept.y = old.y;
+                    kept.z = old.z;
+                  }
+                }
+                const m = selected.value,
+                  others = validation.value.boxes.filter((b) => b.id !== m.id),
+                  dim = dimensions.value,
+                  region = motionRegion.value;
+                const axisList = (n, size) =>
+                  [
+                    ...new Set(
+                      [
+                        0,
+                        (n === "x" ? dim.length : dim.width) - size,
+                        ...others.flatMap((b) => [
+                          b[n],
+                          b[n] + b[n === "x" ? "dx" : "dz"],
+                          b[n] - size,
+                          b[n] + b[n === "x" ? "dx" : "dz"] - size,
+                        ]),
+                      ].filter((v) => Number.isFinite(v) && v >= -EPS),
+                    ),
+                  ].sort(
+                    (a, b) =>
+                      Math.abs(a - (n === "x" ? m.x : m.z)) -
+                        Math.abs(b - (n === "x" ? m.x : m.z)) || a - b,
+                  );
+                const xs = axisList("x", dx),
+                  zs = axisList("z", dz);
+                const levels =
+                  direction > 0
+                    ? [next, ...tops.filter((y) => y > next + 0.001)]
+                    : [next, ...tops.filter((y) => y < next - 0.001)];
+                let tries = 0;
+                outer: for (const y of levels) {
+                  if (y < 0 || y + dy > region.y + EPS) continue;
+                  for (const z of [m.z, ...zs]) {
+                    for (const x of [m.x, ...xs]) {
+                      if (++tries > 260) break outer;
+                      const c = candidatePlace(m.id, x, y, z);
+                      if (c) {
+                        m.x = c.x;
+                        m.y = c.y;
+                        m.z = c.z;
+                        changed = true;
+                        break outer;
+                      }
+                    }
+                  }
+                }
+              }
+            } else changed = translateSelection({ y: next - base }, origins);
+            checkpoint();
+            if (changed)
+              notify(
+                validation.value.valid
+                  ? "已移动到相邻摆放层。"
+                  : "已调整层级；悬空、碰撞等问题需修正后才能参与装载。",
+                validation.value.valid ? "success" : "error",
+              );
+            else notify(hint || "没有可行层级；改变位置会碰撞或破坏支撑。", "error");
+          }
+
+          const memberSource = (m) => PalletGeometry.source(m, items.value),
+            dimsText = (m) =>
+              PalletGeometry.dims(memberSource(m), m.orientation).map(fmt).join(" × "),
+            thumbnail = (it, n) =>
+              PalletGeometry.svg(
+                it &&
+                  [it.l, it.w, it.h].every(
+                    (v) => typeof v === "number" && Number.isFinite(v) && v > 0,
+                  )
+                  ? it
+                  : { l: 1, w: 1, h: 1, color: "#a7bbc8" },
+                n,
+              );
+          const available = (it) =>
+            Math.max(0, Number(it?.qty || 0) - (groupUsage.value.get(it?.uid) || 0));
+          const memberErrors = (id) => validation.value.errors.filter((e) => e.memberId === id);
+          function notify(text, kind = "success") {
+            message.value = text;
+            messageKind.value = kind;
+          }
+          function dismissMessage() {
+            /* Retain the last meaningful operation in the status bar. */
+          }
+          function checkpoint() {
+            if (restore || !group.value) return;
+            clearTimeout(historyTimer);
+            const text = JSON.stringify({ g: group.value, copy: currentCopy.value });
+            if (history.value[historyIndex.value] === text) return;
+            history.value = history.value.slice(0, historyIndex.value + 1);
+            history.value.push(text);
+            if (history.value.length > 80) history.value.shift();
+            historyIndex.value = history.value.length - 1;
+          }
+          function applyHistory() {
+            restore = true;
+            const raw = JSON.parse(history.value[historyIndex.value]),
+              st = raw && raw.g ? raw : { g: raw, copy: 1 };
+            group.value = st.g;
+            currentCopy.value = Math.max(
+              1,
+              Math.min(Number(st.copy) || 1, Math.floor(group.value?.copies) || 1),
+            );
+            selectedIds.value = selectedIds.value.filter((id) =>
+              viewMembers.value.some((m) => m.id === id),
+            );
+            nextTick(() => (restore = false));
+            queueDraw();
+          }
+          function undo() {
+            if (busy.value) return;
+            checkpoint();
+            if (historyIndex.value > 0) {
+              historyIndex.value--;
+              applyHistory();
+              notify("已撤销组合编辑。");
+            }
+          }
+          function redo() {
+            if (!busy.value && historyIndex.value < history.value.length - 1) {
+              historyIndex.value++;
+              applyHistory();
+              notify("已重做组合编辑。");
+            }
+          }
+          function select(id, multi = false) {
+            if (multi) {
+              selectedIds.value = selectedIds.value.includes(id)
+                ? selectedIds.value.filter((x) => x !== id)
+                : [...selectedIds.value, id];
+            } else selectedIds.value = [id];
+            queueDraw();
+          }
+          function locateError(e) {
+            if (e.memberId) {
+              memberListOpen.value = true;
+              selectedIds.value = [e.memberId];
+              nextTick(() =>
+                document
+                  .querySelector(`[data-member-id="${e.memberId}"]`)
+                  ?.scrollIntoView({ block: "nearest" }),
+              );
+              queueDraw();
+            }
+          }
+          function selectionAllows(n) {
+            return (
+              selectedIds.value.length > 0 &&
+              selectedIds.value.every((id) => {
+                const m = group.value.members.find((m) => m.id === id);
+                return m && PalletGeometry.allowed(memberSource(m), n);
+              })
+            );
+          }
+          function changeOrientation(n) {
+            if (!selectionAllows(n)) return;
+            checkpoint();
+            for (const m of mutableMembers())
+              if (selectedIds.value.includes(m.id)) m.orientation = n;
+            checkpoint();
+            notify("已更新方向；若支撑关系改变，请调整高度或落到支撑面。");
+          }
+          function rotateSelected() {
+            if (!selected.value) return;
+            for (let step = 1; step <= 6; step++) {
+              const n = (selected.value.orientation + step) % 6;
+              if (selectionAllows(n)) {
+                changeOrientation(n);
+                break;
+              }
+            }
+          }
+          function deleteSelected() {
+            if (busy.value) return;
+            checkpoint();
+            replaceMembers(viewMembers.value.filter((m) => !selectedIds.value.includes(m.id)));
+            selectedIds.value = [];
+            checkpoint();
+            notify("已删除选中单件，库存恢复。");
+          }
+          function findPosition(m) {
+            const base = viewMembers.value,
+              boxes = base.map((x) => PalletGeometry.box(x, items.value)).filter(Boolean),
+              [dx, dy, dz] = PalletGeometry.dims(memberSource(m), m.orientation),
+              L = dimensions.value.length,
+              W = dimensions.value.width;
+            const xs = [0, L - dx, ...boxes.flatMap((b) => [b.x + b.dx, b.x - dx, b.x])],
+              zs = [0, W - dz, ...boxes.flatMap((b) => [b.z + b.dz, b.z - dz, b.z])],
+              ys = [0, ...boxes.map((b) => b.y + b.dy)];
+            const unique = (a) =>
+              [...new Set(a.filter((v) => Number.isFinite(v) && v >= 0))].sort((a, b) => a - b);
+            let attempts = 0;
+            for (const y of unique(ys))
+              for (const z of unique(zs))
+                for (const x of unique(xs)) {
+                  if (++attempts > 12000) return null;
+                  if (x + dx > L + 0.001 || z + dz > W + 0.001) continue;
+                  const candidate = { ...m, x, y, z };
+                  const v = PalletGeometry.validate(
+                    { ...group.value, copies: 1, members: [...base, candidate] },
+                    items.value,
+                  );
+                  if (v.valid) return candidate;
+                }
+            return null;
+          }
+          function addPieces() {
+            const it = chosenSource.value,
+              n = Number(addQuantity.value);
+            if (!it || !PalletGeometry.int(n) || viewMembers.value.length + n > 500)
+              return notify("选择件数应为整数，每托最多 500 件。", "error");
+            if (n > available(it))
+              return notify(
+                "可用库存不足：货源已被本组合各托及其他组合预留。可切换到还需要补放的托（◀ ▶）后再加入。",
+                "error",
+              );
+            const orientation = orientationLabels.findIndex((_, i) =>
+              PalletGeometry.allowed(it, i),
+            );
+            if (orientation < 0) return notify("该货物没有允许方向。", "error");
+            checkpoint();
+            const old = PalletGeometry.copy(viewMembers.value),
+              added = [],
+              arr = mutableMembers();
+            for (let i = 0; i < n; i++) {
+              const m = findPosition({
+                id: makeId(),
+                itemUid: it.uid,
+                cargoName: it.name,
+                orientation,
+                x: 0,
+                y: 0,
+                z: 0,
+              });
+              if (!m) {
+                replaceMembers(old);
+                return notify(
+                  "当前托无法找到满足边界、支撑、堆叠和顺序的放置位置。可调整托盘、自动排布或换一托再试。",
+                  "error",
+                );
+              }
+              arr.push(m);
+              added.push(m.id);
+            }
+            selectedIds.value = added;
+            checkpoint();
+            notify(
+              `已加入 ${n} 件${currentCopy.value > 1 ? `（仅第 ${currentCopy.value} 托）` : ""}；库存按全部托实际用量合计预留。`,
+            );
+          }
+          function copySelected() {
+            if (!selectedIds.value.length) return;
+            if (viewMembers.value.length + selectedIds.value.length > 500)
+              return notify("每托最多 500 件。", "error");
+            checkpoint();
+            const originals = viewMembers.value.filter((m) => selectedIds.value.includes(m.id)),
+              old = PalletGeometry.copy(viewMembers.value),
+              added = [],
+              arr = mutableMembers();
+            for (const source of originals) {
+              const it = memberSource(source);
+              if (!it) {
+                replaceMembers(old);
+                return notify("选中单件的货源不存在，请先删除它或在第二步恢复对应货物。", "error");
+              }
+              if (available(it) < 1) {
+                replaceMembers(old);
+                return notify("复制会超过可用库存（含各托预留）。", "error");
+              }
+              const m = findPosition({ ...source, id: makeId() });
+              if (!m) {
+                replaceMembers(old);
+                return notify("复制没有可行位置，原布局未改动。", "error");
+              }
+              arr.push(m);
+              added.push(m.id);
+            }
+            selectedIds.value = added;
+            checkpoint();
+          }
+          function generateGrid() {
+            const it = chosenSource.value;
+            if (!it) return;
+            const { rows, columns, layers } = group.value;
+            if (layers > 1 && (it.noOverstack || it.noUnderstack))
+              return notify(
+                it.noOverstack
+                  ? "该货物不可堆叠，不能生成多层组合。"
+                  : "该货物必须置底，不能生成多层组合。",
+                "error",
+              );
+            if (
+              ![rows, columns, layers].every((v) => PalletGeometry.int(v)) ||
+              rows * columns * layers > 500
+            )
+              return notify("行、列、层需为正整数；每托最多 500 件。", "error");
+            if (rows * columns * layers > available(it))
+              return notify("规则组合用量超过货源可用库存（含各托预留）。", "error");
+            if (
+              viewMembers.value.length &&
+              !window.confirm("规则生成会替换当前托的布局，仍可撤销。继续吗？")
+            )
+              return;
+            const n =
+              selectedSource.value?.uid === it.uid &&
+              PalletGeometry.allowed(it, selected.value.orientation)
+                ? selected.value.orientation
+                : orientationLabels.findIndex((_, n) => PalletGeometry.allowed(it, n));
+            checkpoint();
+            const grid = PalletGeometry.gridMembers(
+              { ...group.value, members: [] },
+              it,
+              n,
+              rows,
+              columns,
+              layers,
+              makeId,
+            );
+            replaceMembers(grid);
+            selectedIds.value = grid.length ? [grid[0].id] : [];
+            checkpoint();
+            notify(
+              validation.value.valid
+                ? "已生成规则组合。"
+                : "已生成布局，请检查边界、支撑与库存问题。",
+              validation.value.valid ? "success" : "error",
+            );
+          }
+          function dropSelected() {
+            if (!selectedIds.value.length) return;
+            checkpoint();
+            for (const id of selectedIds.value) {
+              const m = mutableMembers().find((m) => m.id === id),
+                other = viewMembers.value.filter((m) => m.id !== id),
+                levels = [
+                  0,
+                  ...other.map((p) => p.y + PalletGeometry.dims(memberSource(p), p.orientation)[1]),
+                ].sort((a, b) => a - b);
+              let found = false;
+              for (const y of [...new Set(levels)]) {
+                const candidate = { ...m, y };
+                const v = PalletGeometry.validate(
+                  { ...group.value, copies: 1, members: [...other, candidate] },
+                  items.value,
+                );
+                if (v.valid) {
+                  m.y = y;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) notify("没有符合完整支撑、堆叠和顺序限制的高度。", "error");
+            }
+            checkpoint();
+          }
+          function cleanupWorker() {
+            if (worker) worker.terminate();
+            worker = null;
+            if (workerUrl) URL.revokeObjectURL(workerUrl);
+            workerUrl = null;
+            rejectJob = null;
+          }
+          function cancelWorker() {
+            const reject = rejectJob;
+            jobSerial++;
+            cleanupWorker();
+            busy.value = false;
+            if (reject) {
+              const e = new Error("任务已取消");
+              e.name = "AbortError";
+              reject(e);
+            }
+            notify("已取消后台任务，原布局未改动。");
+          }
+          async function wasmJob(type) {
+            if (busy.value || !wasmBuffer || !workerSource) throw new Error("组合数据尚未就绪。");
+            const token = ++jobSerial;
+            busy.value = true;
+            busyLabel.value =
+              type === "arrange"
+                ? "正在排布组合…"
+                : type === "repair"
+                  ? "正在修正布局…"
+                  : "正在校验组合…";
+            try {
+              return await new Promise((resolve, reject) => {
+                rejectJob = reject;
+                workerUrl = URL.createObjectURL(
+                  new Blob([workerSource], { type: "text/javascript" }),
+                );
+                worker = new Worker(workerUrl);
+                worker.onmessage = (e) => {
+                  if (token !== jobSerial) return;
+                  const d = e.data || {};
+                  if (d.type === "done") resolve(d.output);
+                  else if (d.type === "error") reject(new Error(d.error));
+                };
+                worker.onerror = (e) => reject(new Error(e.message || "组合处理失败"));
+                const buffer = wasmBuffer.slice(0);
+                worker.postMessage(
+                  {
+                    type,
+                    items: PalletGeometry.engineItems(items.value.filter((i) => i.qty > 0)).map(
+                      (i) => ({ ...i, name: String(i.name).trim() }),
+                    ),
+                    group: PalletGeometry.engineGroup(
+                      {
+                        ...group.value,
+                        members: viewMembers.value,
+                        copies: 1,
+                        copyLayouts: undefined,
+                      },
+                      items.value,
+                    ),
+                    wasmBuffer: buffer,
+                  },
+                  [buffer],
+                );
+              });
+            } finally {
+              if (token === jobSerial) {
+                cleanupWorker();
+                busy.value = false;
+              }
+            }
+          }
+          async function arrangeWasm() {
+            try {
+              const out = await wasmJob("arrange");
+              if (!out.success)
+                return notify(out.error || out.message || "无法完整混排，原布局未改动。", "error");
+              checkpoint();
+              const lookup = new Map(out.group.members.map((m) => [m.id, m]));
+              for (const m of mutableMembers()) {
+                const n = lookup.get(m.id);
+                if (n) Object.assign(m, { x: n.x, y: n.y, z: n.z, orientation: n.orientation });
+              }
+              checkpoint();
+              notify("排布完成。");
+              fitView();
+            } catch (e) {
+              if (e.name !== "AbortError") notify(e.message, "error");
+            }
+          }
+          async function repair() {
+            if (busy.value || !viewMembers.value.length) return;
+            try {
+              const out = await wasmJob("repair");
+              if (!out || !out.success) {
+                notify((out && out.error) || "当前布局无法自动完成修正，未做任何改动。", "error");
+                return;
+              }
+              checkpoint();
+              const lookup = new Map(out.group.members.map((m) => [m.id, m]));
+              if (
+                viewMembers.value.length !== lookup.size ||
+                viewMembers.value.some((m) => !lookup.has(m.id))
+              ) {
+                notify("修正结果不完整，已保留原布局。", "error");
+                return;
+              }
+              for (const m of mutableMembers()) {
+                const to = lookup.get(m.id);
+                Object.assign(m, { x: to.x, y: to.y, z: to.z, orientation: to.orientation });
+              }
+              checkpoint();
+              const n = out.changed?.length || 0;
+              notify(
+                n
+                  ? `修正完成，移动了 ${n} 件；其余单件、托盘参数和货物限制均未改动。`
+                  : "当前布局已满足所有限制，无需修正。",
+              );
+              if (n) fitView();
+            } catch (e) {
+              if (e.name !== "AbortError") notify(e.message, "error");
+            }
+          }
+          async function save(enabled) {
+            if (busy.value) return;
+            if (enabled) {
+              if (copiesProblem.value.length) {
+                const e = copiesProblem.value[0];
+                notify(`第 ${e.copyIndex} 托仍需修正：${e.message}`, "error");
+                return;
+              }
+              if (!validation.value.valid) return;
+              try {
+                const out = await wasmJob("validate");
+                if (!out.valid) return notify(out.errors?.join("；") || "组合校验失败。", "error");
+              } catch (e) {
+                if (e.name !== "AbortError") notify(e.message, "error");
+                return;
+              }
+            }
+            const data = PalletGeometry.copy(group.value);
+            data.enabled = enabled;
+            parent.postMessage({ kind: "pallet-editor:commit", channel, group: data }, "*");
+          }
+          function cancel() {
+            if (busy.value) cancelWorker();
+            parent.postMessage({ kind: "pallet-editor:cancel", channel }, "*");
+          }
+          const clean = (v) => Math.max(0.1, Math.min(1e7, Number(v) || 1));
+          function frameSize() {
+            const r = motionRegion.value;
+            return {
+              L: clean(r.x),
+              W: clean(r.z),
+              H: clean(r.y + r.thickness),
+              ph: group.value.pallet ? clean(group.value.pallet.thickness) : 0,
+            };
+          }
+          function initVisual() {
+            if (!viewport.value || renderer || canvas) return;
+            try {
+              renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+              renderer.outputEncoding = THREE.sRGBEncoding;
+              renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+              renderer.setClearColor("#f6faf4");
+              viewport.value.appendChild(renderer.domElement);
+              canvas = renderer.domElement;
+              scene = new THREE.Scene();
+              scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+              const light = new THREE.DirectionalLight(0xffffff, 0.75);
+              light.position.set(2000, 4000, 3000);
+              scene.add(light);
+              scene.add(new THREE.HemisphereLight(0xffffff, 0x73897a, 0.6));
+              camera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
+              ortho = new THREE.OrthographicCamera(-1000, 1000, 1000, -1000, 1, 100000);
+              controls = new THREE.OrbitControls(camera, canvas);
+              controls.enableDamping = true;
+              controls.dampingFactor = 0.08;
+              controls.enableZoom = false;
+              controls.minDistance = 20;
+              controls.maxDistance = 90000;
+              controls.minZoom = 0.05;
+              controls.maxZoom = 120;
+              controls.maxPolarAngle = Math.PI / 2 + 0.1;
+              controls.screenSpacePanning = true;
+              controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
+              /* 与主视图一致：左键环绕/右键平移/中键平移，滚轮缩放仍锚定指针 */ zoomNdc =
+                new THREE.Vector2();
+              meshGroup = new THREE.Group();
+              window.__PE_MESHES__ = meshGroup;
+              scene.add(meshGroup);
+              palletVisual = new THREE.Group();
+              scene.add(palletVisual);
+              raycaster = new THREE.Raycaster();
+              pointer = new THREE.Vector2();
+            } catch (e) {
+              if (renderer) {
+                renderer.dispose();
+                renderer = null;
+              }
+              viewport.value.querySelectorAll("canvas").forEach((c) => c.remove());
+              fallback.value = true;
+              canvas = document.createElement("canvas");
+              viewport.value.appendChild(canvas);
+            }
+            canvas.addEventListener("pointerdown", pointerDown);
+            canvas.addEventListener("pointermove", pointerMove);
+            canvas.addEventListener("pointerup", pointerUp);
+            canvas.addEventListener("pointercancel", pointerUp);
+            canvas.addEventListener("wheel", onZoom, { passive: false, capture: true });
+            observer = new ResizeObserver(resize);
+            observer.observe(viewport.value);
+            resize();
+            fitView();
+            drawVisual();
+            animate();
+          }
+          function disposeChildren(g) {
+            while (g?.children.length) {
+              const c = g.children[0];
+              c.traverse((o) => {
+                o.geometry?.dispose();
+                if (o.material) {
+                  for (const m of Array.isArray(o.material) ? o.material : [o.material])
+                    m.dispose();
+                }
+              });
+              g.remove(c);
+            }
+          }
+          function queueDraw() {
+            if (drawPending) return;
+            drawPending = true;
+            requestAnimationFrame(() => {
+              drawPending = false;
+              drawVisual();
+            });
+          }
+          function drawVisual() {
+            if (!initialized.value || !canvas) return;
+            const v = validation.value,
+              { L, W, H, ph } = frameSize();
+            if (fallback.value) {
+              canvas.width = Math.max(1, viewport.value.clientWidth * (devicePixelRatio || 1));
+              canvas.height = Math.max(1, viewport.value.clientHeight * (devicePixelRatio || 1));
+              const parts = v.boxes.map((b) => ({
+                ...b,
+                cargoName: b.item.name,
+                color: memberErrors(b.id).length ? "#bd7766" : b.color,
+                y: b.y + ph,
+              }));
+              const result = {
+                containerLength: L,
+                containerWidth: W,
+                containerHeight: H,
+                palletBases: ph
+                  ? [
+                      {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        dx: dimensions.value.length,
+                        dy: ph,
+                        dz: dimensions.value.width,
+                        color: "#af8d62",
+                        firstItemIndex: 0,
+                        editorPreview: true,
+                        weight: group.value.pallet.weight,
+                      },
+                    ]
+                  : [],
+              };
+              fallbackHits = drawPackingDiagram(
+                canvas.getContext("2d"),
+                canvas.width,
+                canvas.height,
+                result,
+                parts,
+                view.value,
+                null,
+                true,
+                false,
+              );
+              if (selectedIds.value.length) {
+                const ctx2 = canvas.getContext("2d");
+                ctx2.save();
+                ctx2.strokeStyle = "#0f5f9e";
+                ctx2.lineWidth = 3 * (devicePixelRatio || 1);
+                for (const h of fallbackHits)
+                  if (selectedIds.value.includes(h.item.id)) {
+                    ctx2.beginPath();
+                    h.points.forEach((p2, i2) => (i2 ? ctx2.lineTo(...p2) : ctx2.moveTo(...p2)));
+                    ctx2.closePath();
+                    ctx2.stroke();
+                  }
+                ctx2.restore();
+              }
+              return;
+            }
+            const boardL = clean(dimensions.value.length),
+              boardW = clean(dimensions.value.width),
+              signature = [L, W, H, ph, boardL, boardW, !!group.value.pallet].join("|");
+            if (signature !== frameSignature) {
+              frameSignature = signature;
+              disposeChildren(palletVisual);
+              const slab = group.value.pallet ? createPalletVisual(boardL, ph, boardW) : null;
+              if (slab) {
+                slab.position.set(boardL / 2, 0, boardW / 2);
+                palletVisual.add(slab);
+              }
+              const floor = new THREE.GridHelper(Math.max(L, W) * 1.2, 20, 0x9eafb5, 0xd9e2dc);
+              floor.position.set(L / 2, -0.5, W / 2);
+              palletVisual.add(floor);
+              const frame = new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(L, H, W)),
+                new THREE.LineBasicMaterial({ color: 0xa8b9be, transparent: true, opacity: 0.35 }),
+              );
+              frame.position.set(L / 2, H / 2, W / 2);
+              palletVisual.add(frame);
+            }
+            const present = new Set(v.boxes.map((b) => b.id));
+            for (const [id, mesh] of meshCache)
+              if (!present.has(id)) {
+                meshGroup.remove(mesh);
+                mesh.traverse((o) => {
+                  o.geometry?.dispose();
+                  o.material?.dispose();
+                });
+                meshCache.delete(id);
+              }
+            for (const b of v.boxes) {
+              if (![b.x, b.y, b.z, b.dx, b.dy, b.dz].every(Number.isFinite)) continue;
+              const selected = selectedIds.value.includes(b.id),
+                invalid = memberErrors(b.id).length > 0,
+                color = invalid ? "#c1816b" : b.color;
+              const shape = [clean(b.dx), clean(b.dy), clean(b.dz)].join("|");
+              let mesh = meshCache.get(b.id);
+              if (mesh && mesh.userData.shape !== shape) {
+                meshGroup.remove(mesh);
+                mesh.traverse((o) => {
+                  o.geometry?.dispose();
+                  o.material?.dispose();
+                });
+                meshCache.delete(b.id);
+                mesh = null;
+              }
+              if (!mesh) {
+                mesh = new THREE.Mesh(
+                  new THREE.BoxGeometry(clean(b.dx), clean(b.dy), clean(b.dz)),
+                  new THREE.MeshStandardMaterial({ color, roughness: 0.7, transparent: true }),
+                );
+                mesh.userData.id = b.id;
+                mesh.userData.shape = shape;
+                mesh.add(
+                  new THREE.LineSegments(
+                    new THREE.EdgesGeometry(mesh.geometry),
+                    new THREE.LineBasicMaterial(),
+                  ),
+                );
+                meshCache.set(b.id, mesh);
+                meshGroup.add(mesh);
+              }
+              mesh.material.color.set(color); // 选中件：不透明 + 明显蓝色自发光 + 深蓝描边；未选中件压暗，保证一眼可辨。
+              mesh.material.opacity = selected ? 1 : 0.6;
+              mesh.material.emissive.set(selected ? 0x1b6bb0 : 0x000000);
+              mesh.material.emissiveIntensity = selected ? 0.55 : 0;
+              mesh.children[0].material.color.set(
+                selected ? 0x0f5f9e : invalid ? 0xa84d36 : 0x536f82,
+              );
+              mesh.position.set(b.x + b.dx / 2, ph + b.y + b.dy / 2, b.z + b.dz / 2);
+            }
+          }
+          function resize() {
+            if (!viewport.value || !canvas) return;
+            const w = viewport.value.clientWidth,
+              h = viewport.value.clientHeight;
+            if (!w || !h) return;
+            if (renderer) {
+              renderer.setSize(w, h, false);
+              camera.aspect = w / h;
+              camera.updateProjectionMatrix();
+              fitOrtho();
+            } else queueDraw();
+          }
+          function fitOrtho() {
+            if (!ortho) return;
+            const { L, W, H } = frameSize(),
+              aspect = Math.max(
+                0.1,
+                viewport.value.clientWidth / Math.max(1, viewport.value.clientHeight),
+              ),
+              span =
+                view.value === "top"
+                  ? Math.max(W, L / aspect)
+                  : view.value === "front"
+                    ? Math.max(H, W / aspect)
+                    : Math.max(H, L / aspect);
+            ortho.left = -span * aspect * 0.67;
+            ortho.right = span * aspect * 0.67;
+            ortho.top = span * 0.67;
+            ortho.bottom = -span * 0.67;
+            ortho.updateProjectionMatrix();
+          }
+          function fitView() {
+            if (!group.value || !camera) {
+              queueDraw();
+              return;
+            }
+            const { L, W, H } = frameSize(),
+              target = new THREE.Vector3(L / 2, H / 2, W / 2),
+              dist = Math.max(L, W, H) * 2;
+            const dir =
+              view.value === "front"
+                ? new THREE.Vector3(1, 0, 0)
+                : view.value === "side"
+                  ? new THREE.Vector3(0, 0, 1)
+                  : view.value === "top"
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(1, 0.9, 1.2).normalize();
+            const next = view.value === "iso" ? camera : ortho;
+            next.up.set(0, 1, 0);
+            if (view.value === "top") next.up.set(0, 0, -1);
+            next.position.copy(target).addScaledVector(dir, dist);
+            next.lookAt(target);
+            next.near = 1;
+            next.far = dist * 6;
+            next.zoom = 1;
+            next.updateProjectionMatrix();
+            controls.object = next;
+            controls.target.copy(target);
+            controls.enableRotate = view.value === "iso";
+            controls.update();
+            fitOrtho();
+            queueDraw();
+          }
+          function setView(mode) {
+            view.value = mode;
+            fitView();
+          }
+          function animate() {
+            raf = requestAnimationFrame(animate);
+            if (!renderer || document.hidden) return;
+            controls.update();
+            renderer.render(scene, controls.object);
+          }
+          let zoomQueue = 0,
+            zoomRaf = 0,
+            zoomNdc = null;
+          function onZoom(event) {
+            if (busy.value || fallback.value || !controls || drag) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const rect = canvas.getBoundingClientRect();
+            zoomNdc.set(
+              ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+              -(((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1),
+            );
+            zoomQueue += event.deltaY;
+            if (!zoomRaf)
+              zoomRaf = requestAnimationFrame(() => {
+                zoomRaf = 0;
+                applyPointerZoom(zoomQueue);
+                zoomQueue = 0;
+              });
+          }
+          function cursorTargets(cam, ndc, depthOf) {
+            if (cam.isPerspectiveCamera) {
+              const far = new THREE.Vector3(ndc.x, ndc.y, 1).unproject(cam),
+                dir = far.sub(cam.position).normalize(),
+                t = depthOf.clone().sub(cam.position).dot(dir);
+              return cam.position.clone().addScaledVector(dir, t);
+            }
+            const origin = new THREE.Vector3(ndc.x, ndc.y, 0.5).unproject(cam),
+              dir = cam.getWorldDirection(new THREE.Vector3()),
+              t = depthOf.clone().sub(origin).dot(dir);
+            return origin.clone().addScaledVector(dir, t);
+          }
+          function applyPointerZoom(delta) {
+            if (fallback.value || !controls || !renderer) return;
+            const cam = controls.object,
+              ndc = zoomNdc.clone(),
+              oldTarget = controls.target.clone(),
+              before = cursorTargets(cam, ndc, oldTarget);
+            if (cam.isPerspectiveCamera) {
+              const offset = cam.position.clone().sub(oldTarget),
+                length = Math.min(
+                  controls.maxDistance,
+                  Math.max(controls.minDistance, offset.length() * Math.exp(delta * 0.0013)),
+                );
+              if (Math.abs(length - offset.length()) < 0.0001) return;
+              cam.position.copy(oldTarget).addScaledVector(offset.normalize(), length);
+              cam.updateMatrixWorld();
+            } else if (cam.isOrthographicCamera) {
+              const zoom = Math.min(
+                controls.maxZoom,
+                Math.max(controls.minZoom, cam.zoom * Math.exp(-delta * 0.0013)),
+              );
+              if (Math.abs(zoom - cam.zoom) < 1e-12) return;
+              cam.zoom = zoom;
+              cam.updateProjectionMatrix();
+              cam.updateMatrixWorld();
+            } else return;
+            const after = cursorTargets(cam, ndc, oldTarget);
+            controls.target.add(before.sub(after));
+            controls.update();
+            renderer.render(scene, cam);
+          }
+          function ray(event) {
+            const rect = canvas.getBoundingClientRect();
+            pointer.set(
+              ((event.clientX - rect.left) / rect.width) * 2 - 1,
+              (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+            );
+            raycaster.setFromCamera(pointer, controls.object);
+            return raycaster;
+          }
+          function snapped(v) {
+            return Number(snap.value) > 0
+              ? Math.round(v / Number(snap.value)) * Number(snap.value)
+              : v;
+          }
+          function pointerDown(event) {
+            if (busy.value || event.button !== 0) return;
+            if (fallback.value) {
+              const rect = canvas.getBoundingClientRect(),
+                px = ((event.clientX - rect.left) * canvas.width) / rect.width,
+                py = ((event.clientY - rect.top) * canvas.height) / rect.height,
+                ctx = canvas.getContext("2d");
+              let hit = null;
+              for (const h of [...fallbackHits].reverse()) {
+                ctx.beginPath();
+                h.points.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p)));
+                ctx.closePath();
+                if (ctx.isPointInPath(px, py)) {
+                  hit = h;
+                  break;
+                }
+              }
+              if (!hit) return;
+              select(hit.item.id, event.ctrlKey || event.metaKey);
+              if (
+                view.value === "top" &&
+                tool.value === "move" &&
+                !event.ctrlKey &&
+                !event.metaKey
+              ) {
+                const m = selected.value,
+                  scale =
+                    (((hit.points[1][0] - hit.points[0][0]) / hit.item.dx) * rect.width) /
+                    canvas.width;
+                checkpoint();
+                drag = {
+                  type: "fallback",
+                  id: m.id,
+                  cx: event.clientX,
+                  cz: event.clientY,
+                  x: m.x,
+                  z: m.z,
+                  scale,
+                  members: selectionOrigins(),
+                };
+                canvas.setPointerCapture(event.pointerId);
+              }
+              return;
+            }
+            const hit = ray(event).intersectObjects(meshGroup.children, false)[0];
+            if (!hit) return;
+            if (event.ctrlKey || event.metaKey) {
+              select(hit.object.userData.id, true);
+              return;
+            }
+            if (!selectedIds.value.includes(hit.object.userData.id)) select(hit.object.userData.id);
+            if (tool.value !== "move") return;
+            const m = selected.value,
+              { ph } = frameSize(),
+              plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(ph + m.y)),
+              point = new THREE.Vector3();
+            if (!raycaster.ray.intersectPlane(plane, point)) return;
+            checkpoint();
+            drag = {
+              id: m.id,
+              plane,
+              point: point.clone(),
+              x: m.x,
+              z: m.z,
+              members: selectionOrigins(),
+            };
+            controls.enabled = false;
+            canvas.setPointerCapture(event.pointerId);
+          }
+          function pointerMove(event) {
+            if (!drag) return;
+            if (drag.type === "fallback") {
+              translateSelection(
+                {
+                  x: snapped(drag.x + (event.clientX - drag.cx) / drag.scale) - drag.x,
+                  z: snapped(drag.z + (event.clientY - drag.cz) / drag.scale) - drag.z,
+                },
+                drag.members,
+              );
+              return;
+            }
+            const point = new THREE.Vector3();
+            if (!ray(event).ray.intersectPlane(drag.plane, point)) return;
+            const m = mutableMembers().find((m) => m.id === drag.id),
+              [dx, , dz] = PalletGeometry.dims(memberSource(m), m.orientation);
+            let x = snapped(drag.x + point.x - drag.point.x),
+              z = snapped(drag.z + point.z - drag.point.z);
+            if (magnet.value) {
+              const tol = Math.max(Number(snap.value) || 10, 10),
+                other = validation.value.boxes.filter((b) => !selectedIds.value.includes(b.id)),
+                xs = [
+                  0,
+                  dimensions.value.length - dx,
+                  ...other.flatMap((b) => [b.x - dx, b.x + b.dx]),
+                ],
+                zs = [
+                  0,
+                  dimensions.value.width - dz,
+                  ...other.flatMap((b) => [b.z - dz, b.z + b.dz]),
+                ];
+              const closest = (v, a) =>
+                a.reduce(
+                  (best, n) => (Math.abs(n - v) < Math.abs(best - v) ? n : best),
+                  v + tol * 2,
+                );
+              const xx = closest(x, xs),
+                zz = closest(z, zs);
+              if (Math.abs(xx - x) <= tol) x = xx;
+              if (Math.abs(zz - z) <= tol) z = zz;
+            }
+            translateSelection({ x: x - drag.x, z: z - drag.z }, drag.members);
+          }
+          function pointerUp(event) {
+            if (!drag) return;
+            const note = drag.note;
+            drag = null;
+            if (note) notify(note, "error");
+            if (controls) controls.enabled = true;
+            try {
+              canvas.releasePointerCapture(event.pointerId);
+            } catch (_) {}
+            checkpoint();
+          }
+          function keydown(event) {
+            const input = /^(input|textarea|select)$/i.test(event.target?.tagName),
+              ctrl = event.ctrlKey || event.metaKey,
+              key = event.key.toLowerCase();
+            if (key === "escape") {
+              event.preventDefault();
+              busy.value ? cancelWorker() : cancel();
+              return;
+            }
+            if (ctrl && key === "s") {
+              event.preventDefault();
+              save(!event.shiftKey);
+              return;
+            }
+            if (key === "f1") {
+              event.preventDefault();
+              notify(
+                "F5 混排 · Ctrl+S 保存参与 · Ctrl+Shift+S 停用草稿 · Ctrl+Z/Y 撤销重做 · Ctrl 多选 · 方向键移动 · PageUp/Down 升降一层 · Shift+PageUp/Down 微调高度 · R 旋转 · Esc 取消",
+              );
+              return;
+            }
+            if (key === "f5") {
+              event.preventDefault();
+              if (!busy.value && viewMembers.value.length) arrangeWasm();
+              return;
+            }
+            if (ctrl && !input && key === "z") {
+              event.preventDefault();
+              event.shiftKey ? redo() : undo();
+              return;
+            }
+            if (ctrl && !input && key === "y") {
+              event.preventDefault();
+              redo();
+              return;
+            }
+            if (ctrl && !input && key === "a") {
+              event.preventDefault();
+              selectedIds.value = viewMembers.value.map((m) => m.id);
+              return;
+            }
+            if (ctrl && !input && key === "d") {
+              event.preventDefault();
+              copySelected();
+              return;
+            }
+            if (input || busy.value) return;
+            if (key === "delete") {
+              event.preventDefault();
+              deleteSelected();
+              return;
+            }
+            if (key === "r") {
+              event.preventDefault();
+              rotateSelected();
+              return;
+            }
+            if ((key === "pageup" || key === "pagedown") && selectedIds.value.length) {
+              event.preventDefault();
+              const dir = key === "pageup" ? 1 : -1;
+              if (event.shiftKey) moveSelection("y", dir * Math.max(1, Number(snap.value) || 10));
+              else moveLayer(dir);
+              return;
+            }
+            const moves = {
+              arrowleft: ["x", -1],
+              arrowright: ["x", 1],
+              arrowup: ["z", -1],
+              arrowdown: ["z", 1],
+            };
+            if (moves[key] && selectedIds.value.length) {
+              event.preventDefault();
+              const [axis, dir] = moves[key];
+              moveSelection(axis, dir * Math.max(1, Number(snap.value) || 10));
+            }
+          }
+          async function receive(event) {
+            if (event.source !== parent) return;
+            const d = event.data || {};
+            if (d.kind === "pallet-editor:rejected" && d.channel === channel) {
+              notify(d.message, "error");
+              return;
+            }
+            if (d.kind !== "pallet-editor:init" || !d.channel) return;
+            if (initialized.value && channel === d.channel) return;
+            channel = d.channel;
+            items.value = d.items || [];
+            group.value = PalletGeometry.copy(d.group);
+            currentCopy.value = 1;
+            wasmBuffer = d.wasmBuffer;
+            workerSource = d.workerSource;
+            sourceId.value = items.value.find((i) => i.qty > 0)?.uid || null;
+            selectedIds.value = group.value.members.length ? [group.value.members[0].id] : [];
+            initialized.value = true;
+            history.value = [];
+            historyIndex.value = -1;
+            checkpoint();
+            if (d.fontBase64) {
+              try {
+                const s = atob(d.fontBase64),
+                  a = new Uint8Array(s.length);
+                for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i);
+                const face = new FontFace("ClassicCN", a.buffer);
+                await face.load();
+                document.fonts.add(face);
+              } catch (_) {}
+            }
+            await nextTick();
+            initVisual();
+          }
+          window.addEventListener("message", receive);
+          window.addEventListener("keydown", keydown);
+          window.addEventListener("beforeunload", () => {
+            cleanupWorker();
+            if (raf) cancelAnimationFrame(raf);
+            if (zoomRaf) cancelAnimationFrame(zoomRaf);
+            observer?.disconnect();
+            controls?.dispose();
+            renderer?.dispose();
+            renderer?.forceContextLoss();
+          });
+          watch(
+            () => validation.value.errors.length,
+            (n, o) => {
+              if (n && n !== o) {
+                propsTab.value = "check";
+              }
+            },
+          );
+          watch(selectedIds, (n) => {
+            if (n.length) {
+              propsTab.value = "item";
+            }
+          });
+          watch(
+            group,
+            () => {
+              queueDraw();
+              if (!restore && !drag) {
+                clearTimeout(historyTimer);
+                historyTimer = setTimeout(checkpoint, 400);
+              }
+            },
+            { deep: true },
+          );
+          watch(selectedIds, queueDraw, { deep: true });
+          onMounted(() => parent.postMessage({ kind: "pallet-editor:ready" }, "*"));
+          return {
+            group,
+            items,
+            initialized,
+            memberListOpen,
+            sourceId,
+            search,
+            addQuantity,
+            selectedIds,
+            tool,
+            view,
+            snap,
+            magnet,
+            viewport,
+            fallback,
+            message,
+            messageKind,
+            busy,
+            busyLabel,
+            history,
+            historyIndex,
+            fmt,
+            views,
+            orientationLabels,
+            chosenSource,
+            filteredItems,
+            selected,
+            selectedSource,
+            counts,
+            validation,
+            allCopiesCheck,
+            copiesProblem,
+            canCommit,
+            hasBoard,
+            dimensions,
+            memberSource,
+            dimsText,
+            thumbnail,
+            available,
+            memberErrors,
+            notify,
+            dismissMessage,
+            checkpoint,
+            undo,
+            redo,
+            select,
+            locateError,
+            selectionAllows,
+            changeOrientation,
+            rotateSelected,
+            deleteSelected,
+            addPieces,
+            copySelected,
+            generateGrid,
+            dropSelected,
+            moveLayer,
+            moveSelection,
+            setCoordinate,
+            motionRegion,
+            arrangeWasm,
+            repair,
+            save,
+            cancel,
+            cancelWorker,
+            setView,
+            fitView,
+            currentCopy,
+            viewMembers,
+            copyCustomized,
+            customCopyCount,
+            switchCopy,
+            syncCopies,
+            resetCopyToTemplate,
+            editorReuse,
+            reuseInfo,
+            groupUsage,
+            layoutScope,
+            sourcesOpen,
+            propsOpen,
+            propsTab,
+          };
+        },
+        template: "#pe-template",
+      }).mount("#pe-app");
+    </script>
+  </body>
+</html>
