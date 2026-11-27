@@ -15,8 +15,13 @@ const EPS: f64 = 1e-6;
 const SUPPORT_EPS: f64 = 1e-3;
 const MAX_EMPTY_SPACES: usize = 1_024;
 const MAX_TOP_SURFACE_ANCHORS: usize = 64;
+/// Extra plan rebuilds allowed for the order search in `solve`, and the work
+/// they may spend. Measured natively this adds roughly 1–3.5 s to a plan that
+/// needs more than one container (see `examples/bench.rs`).
+const ORDER_SEARCH_PASSES: usize = 100;
+const ORDER_SEARCH_WORK: u64 = 3_000_000;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerDef {
     pub key: String,
@@ -25,6 +30,27 @@ pub struct ContainerDef {
     pub width: f64,
     pub height: f64,
     pub max_weight: f64,
+    // Optional load-balance limits. Zero (the default) disables a limit, so
+    // existing callers keep their previous behaviour.
+    /// Largest permitted distance, along the length, between the cargo centre
+    /// of gravity and the middle of the container (mm).
+    #[serde(default)]
+    pub max_cog_offset_x: f64,
+    /// Same limit across the width (mm).
+    #[serde(default)]
+    pub max_cog_offset_z: f64,
+    /// Positions of the two supports (axles, axle groups or corner supports)
+    /// measured from the front wall along the length (mm). The cargo weight is
+    /// shared between them by the lever rule. Used when rear > front.
+    #[serde(default)]
+    pub front_axle_pos: f64,
+    #[serde(default)]
+    pub rear_axle_pos: f64,
+    /// Largest cargo load each support may carry (kg).
+    #[serde(default)]
+    pub max_front_axle_load: f64,
+    #[serde(default)]
+    pub max_rear_axle_load: f64,
 }
 
 // Internal physical support metadata cannot be supplied by imported JSON.
@@ -50,6 +76,9 @@ struct RigidSupport {
     cargo_weight: f64,
     load_above: f64,
     parents: Vec<usize>,
+    /// Centre of gravity of the whole unit (deck included), measured from the
+    /// unit's minimum corner in its unrotated frame.
+    cog: [f64; 3],
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -139,6 +168,16 @@ pub struct PackResult {
     pub total_weight: f64,
     pub used_length: f64,
     pub tail_space: f64,
+    /// Cargo centre of gravity in container coordinates (mm).
+    pub cog_x: f64,
+    pub cog_y: f64,
+    pub cog_z: f64,
+    /// Cargo load on each support; absent when no support positions are set.
+    pub front_axle_load: Option<f64>,
+    pub rear_axle_load: Option<f64>,
+    /// Rigid shift applied to the finished load to meet the balance limits.
+    pub load_shift_x: f64,
+    pub load_shift_z: f64,
     pub placed: Vec<PlacedItem>,
     pub unplaced: Vec<ItemDef>,
 }
@@ -190,14 +229,31 @@ struct PlanScore {
     unplaced_pieces: u32,
     total_container_volume: f64,
     container_count: usize,
+    /// Cargo volume in the last container; less means the earlier containers
+    /// are fuller and the spare room is in one place.
+    last_container_volume: f64,
 }
 
 fn finite_positive(value: f64) -> bool {
     value.is_finite() && value > EPS
 }
 
+fn balance_fields_are_valid(container: &ContainerDef) -> bool {
+    [
+        container.max_cog_offset_x,
+        container.max_cog_offset_z,
+        container.max_front_axle_load,
+        container.max_rear_axle_load,
+    ]
+    .iter()
+    .all(|value| value.is_finite() && *value >= 0.0)
+        && container.front_axle_pos.is_finite()
+        && container.rear_axle_pos.is_finite()
+}
+
 fn container_is_valid(container: &ContainerDef) -> bool {
-    finite_positive(container.length)
+    balance_fields_are_valid(container)
+        && finite_positive(container.length)
         && finite_positive(container.width)
         && finite_positive(container.height)
         && container.max_weight.is_finite()
@@ -405,6 +461,7 @@ fn rigid_oriented(profile: &RigidSupport, orientation: Orientation) -> RigidSupp
             .collect();
         p.length = orientation.dx;
         p.width = orientation.dz;
+        p.cog = [profile.width - p.cog[2], p.cog[1], p.cog[0]];
     }
     p.load_above = 0.;
     p.parents.clear();
@@ -844,6 +901,25 @@ fn rank_items(items: &[ItemDef], variant: usize) -> Vec<usize> {
     ranks
 }
 
+/// SKU order used by the extra search passes in `solve`: lower key first.
+/// The key belongs to the cargo name, so one SKU keeps its rank in every
+/// container of the same pass. Unknown names go last.
+fn keyed_ranks(items: &[ItemDef], keys: &HashMap<String, f64>) -> Vec<usize> {
+    let key = |item: &ItemDef| keys.get(cargo_key(item)).copied().unwrap_or(f64::INFINITY);
+    let mut order: Vec<usize> = (0..items.len()).collect();
+    order.sort_by(|&left, &right| {
+        key(&items[left])
+            .partial_cmp(&key(&items[right]))
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| left.cmp(&right))
+    });
+    let mut ranks = vec![0; items.len()];
+    for (rank, index) in order.into_iter().enumerate() {
+        ranks[index] = rank;
+    }
+    ranks
+}
+
 /// Stable size preference used only when both candidates have no explicit
 /// cargo priority. Variants still provide geometric diversity after this
 /// user-facing preference has been respected.
@@ -990,10 +1066,38 @@ fn pack_one_container(
     loading_preference: &str,
     continuation_key: Option<&str>,
 ) -> PackResult {
+    pack_one_container_seeded(
+        container,
+        input,
+        strategy,
+        variant,
+        loading_preference,
+        continuation_key,
+        None,
+        &mut 0,
+    )
+}
+
+/// `order` replaces the selected large/small loading preference with an
+/// explicit SKU order. `work` accumulates a machine-independent effort count.
+fn pack_one_container_seeded(
+    container: &ContainerDef,
+    input: &[ItemDef],
+    strategy: &str,
+    variant: usize,
+    loading_preference: &str,
+    continuation_key: Option<&str>,
+    order: Option<&HashMap<String, f64>>,
+    work: &mut u64,
+) -> PackResult {
     let mut remaining = input.to_vec();
     let ranks = rank_items(&remaining, variant);
-    let load_ranks = preference_ranks(&remaining, loading_preference);
-    let mut placed = Vec::new();
+    let load_ranks = match order {
+        Some(keys) => keyed_ranks(&remaining, keys),
+        None => preference_ranks(&remaining, loading_preference),
+    };
+    let mut placed: Vec<PlacedItem> = Vec::new();
+    let mut placed_sources: Vec<usize> = Vec::new();
     let mut spaces = vec![Space {
         x: 0.0,
         y: 0.0,
@@ -1006,6 +1110,8 @@ fn pack_one_container(
 
     loop {
         let mut best: Option<Candidate> = None;
+        *work +=
+            (remaining.len() * (spaces.len() + placed.len().min(MAX_TOP_SURFACE_ANCHORS))) as u64;
         for (item_index, item) in remaining.iter().enumerate() {
             if item.qty == 0 || total_weight + item.weight > container.max_weight + EPS {
                 continue;
@@ -1168,7 +1274,30 @@ fn pack_one_container(
         };
         update_empty_spaces(&mut spaces, &newly_placed);
         placed.push(newly_placed);
+        placed_sources.push(candidate.item_index);
     }
+
+    // Balance limits: see `balance.rs`. Without limits nothing moves.
+    let mut load_shift = (0.0, 0.0);
+    if balance::has_limits(container) {
+        loop {
+            if let Some(shift) = balance::required_shift(container, &placed) {
+                load_shift = shift;
+                break;
+            }
+            let (Some(removed), Some(source)) = (placed.pop(), placed_sources.pop()) else {
+                break;
+            };
+            remaining[source].qty += 1;
+            total_weight -= removed.weight;
+        }
+        for item in &mut placed {
+            item.x += load_shift.0;
+            item.z += load_shift.1;
+        }
+    }
+    let load = balance::measure(&placed);
+    let support_loads = balance::support_loads(container, load.weight, load.cog[0]);
 
     let volume = container_volume(container);
     let used_volume: f64 = placed.iter().map(placed_volume).sum();
@@ -1195,6 +1324,13 @@ fn pack_one_container(
         total_weight,
         used_length,
         tail_space: (container.length - used_length).max(0.0),
+        cog_x: load.cog[0],
+        cog_y: load.cog[1],
+        cog_z: load.cog[2],
+        front_axle_load: support_loads.map(|loads| loads.0),
+        rear_axle_load: support_loads.map(|loads| loads.1),
+        load_shift_x: load_shift.0,
+        load_shift_z: load_shift.1,
         placed,
         unplaced: remaining.into_iter().filter(|item| item.qty > 0).collect(),
     }
@@ -1257,6 +1393,7 @@ fn plan_score(results: &[PackResult], remaining: &[ItemDef]) -> PlanScore {
             })
             .sum(),
         container_count: results.len(),
+        last_container_volume: results.last().map_or(0.0, result_volume),
     }
 }
 
@@ -1267,14 +1404,27 @@ fn plan_is_better(candidate: PlanScore, current: PlanScore, priority: &str) -> b
     if candidate.unplaced_pieces != current.unplaced_pieces {
         return candidate.unplaced_pieces < current.unplaced_pieces;
     }
-    if (candidate.total_container_volume - current.total_container_volume).abs() > EPS {
-        return if priority == "small" {
-            candidate.total_container_volume < current.total_container_volume
-        } else {
-            candidate.total_container_volume > current.total_container_volume
-        };
+    // With the same cargo loaded, a plan never wins by using more containers.
+    // "small" minimises total container volume first; "large" minimises the
+    // number of containers first and then favours the larger types.
+    let volume_differs =
+        (candidate.total_container_volume - current.total_container_volume).abs() > EPS;
+    if priority == "small" {
+        if volume_differs {
+            return candidate.total_container_volume < current.total_container_volume;
+        }
+        if candidate.container_count != current.container_count {
+            return candidate.container_count < current.container_count;
+        }
+    } else {
+        if candidate.container_count != current.container_count {
+            return candidate.container_count < current.container_count;
+        }
+        if volume_differs {
+            return candidate.total_container_volume > current.total_container_volume;
+        }
     }
-    candidate.container_count < current.container_count
+    candidate.last_container_volume < current.last_container_volume - EPS
 }
 
 /// Select the SKU that should lead the next container. It is deliberately a
@@ -1335,24 +1485,45 @@ fn solve(
         _ => 5,
     };
     let mut best_plan: Option<(Vec<PackResult>, Vec<ItemDef>, PlanScore)> = None;
-
-    for variant in 0..iterations {
+    let mut work = 0u64;
+    let build = |variant: usize,
+                 order: Option<&HashMap<String, f64>>,
+                 incumbent: Option<PlanScore>,
+                 work: &mut u64| {
         let mut remaining = items.clone();
-        let mut results = Vec::new();
+        let mut results: Vec<PackResult> = Vec::new();
         let mut continuation_key: Option<String> = None;
         // Every successful container removes at least one solver unit.
         let mut remaining_attempts = total_units.max(1);
         while remaining.iter().any(|item| item.qty > 0) && remaining_attempts > 0 {
             remaining_attempts -= 1;
+            // A pass that already needs as many containers as a complete
+            // incumbent, with cargo still waiting, cannot win: stop it early.
+            if let Some(score) = incumbent {
+                let volume: f64 = results
+                    .iter()
+                    .map(|r| r.container_length * r.container_width * r.container_height)
+                    .sum();
+                let hopeless = if priority == "small" {
+                    volume >= score.total_container_volume - EPS
+                } else {
+                    results.len() >= score.container_count
+                };
+                if score.unplaced_pieces == 0 && hopeless {
+                    return None;
+                }
+            }
             let mut best: Option<PackResult> = None;
             for template in &templates {
-                let candidate = pack_one_container(
+                let candidate = pack_one_container_seeded(
                     template,
                     &remaining,
                     strategy,
                     variant + results.len(),
                     loading_preference,
                     continuation_key.as_deref(),
+                    order,
+                    work,
                 );
                 if candidate.placed.is_empty() {
                     continue;
@@ -1372,10 +1543,76 @@ fn solve(
             results.push(selected);
         }
         let score = plan_score(&results, &remaining);
+        Some((results, remaining, score))
+    };
+
+    for variant in 0..iterations {
+        let Some(plan) = build(variant, None, None, &mut work) else {
+            continue;
+        };
         if best_plan.as_ref().map_or(true, |(_, _, current)| {
-            plan_is_better(score, *current, priority)
+            plan_is_better(plan.2, *current, priority)
         }) {
-            best_plan = Some((results, remaining, score));
+            best_plan = Some(plan);
+        }
+    }
+
+    // Order search. The passes above differ only in their last tie-breaker,
+    // so they rarely reach a different plan. The size preference decides
+    // which SKU takes each frontier position, and nothing above revisits it.
+    // Here one or two SKUs are moved to another place in that order and the
+    // whole plan is rebuilt; an order that is not worse becomes the new
+    // starting point. The plan found above stays unless a pass strictly beats
+    // it, so the outcome is never worse by `plan_is_better`. Effort is bounded
+    // by a fixed work budget rather than a clock, which keeps results
+    // identical on every machine.
+    let order_ranks = preference_ranks(&items, loading_preference);
+    let mut names: Vec<&str> = Vec::new();
+    let mut keys: HashMap<String, f64> = HashMap::new();
+    for (index, item) in items.iter().enumerate() {
+        let name = cargo_key(item);
+        if !names.contains(&name) {
+            names.push(name);
+        }
+        let key = keys.entry(name.to_string()).or_insert(f64::INFINITY);
+        *key = key.min(order_ranks[index] as f64);
+    }
+    let mut random_state = 0x9E37_79B9_7F4A_7C15_u64;
+    let mut random = move || {
+        // splitmix64
+        random_state = random_state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = random_state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    let work_limit = work.saturating_add(ORDER_SEARCH_WORK);
+    for pass in 0..ORDER_SEARCH_PASSES {
+        let Some(incumbent) = best_plan.as_ref().map(|plan| plan.2) else {
+            break;
+        };
+        // Nothing to reorder, everything already in one container, or the
+        // budget is spent.
+        if names.len() < 2
+            || (incumbent.unplaced_pieces == 0 && incumbent.container_count <= 1)
+            || work >= work_limit
+        {
+            break;
+        }
+        let mut trial = keys.clone();
+        for _ in 0..1 + random() % 2 {
+            let name = names[(random() % names.len() as u64) as usize];
+            let slot = (random() % (2 * names.len() as u64 + 1)) as f64 / 2.0 - 0.75;
+            trial.insert(name.to_string(), slot);
+        }
+        let Some(plan) = build(iterations + pass, Some(&trial), Some(incumbent), &mut work) else {
+            continue;
+        };
+        if plan_is_better(plan.2, incumbent, priority) {
+            best_plan = Some(plan);
+            keys = trial;
+        } else if !plan_is_better(incumbent, plan.2, priority) {
+            keys = trial;
         }
     }
 
@@ -1463,6 +1700,7 @@ mod tests {
             width,
             height,
             max_weight: 10_000.0,
+            ..Default::default()
         }
     }
 
@@ -1768,5 +2006,8 @@ mod tests {
     }
 }
 
+mod balance;
+#[cfg(test)]
+mod balance_tests;
 mod pallet_v4;
 pub use pallet_v4::{arrange_pallet_v4, run_pack_engine_v4, validate_pallet_v4};

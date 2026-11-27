@@ -333,6 +333,37 @@ pub fn validate_pallet_v4(items_json: &str, group_json: &str) -> String {
         Err(e) => json!({"valid":false,"errors":[e]}).to_string(),
     }
 }
+/// Centre of gravity of a checked unit, measured from its minimum corner:
+/// every member at its own centre plus the deck at the centre of the unit
+/// footprint.
+fn unit_cog(c: &Checked) -> [f64; 3] {
+    let mut moment = [0.0; 3];
+    let mut weight = 0.0;
+    for p in &c.parts {
+        let centre = [
+            p.m.x - c.min_x + p.o.dx / 2.0,
+            c.ph + p.m.y + p.o.dy / 2.0,
+            p.m.z - c.min_z + p.o.dz / 2.0,
+        ];
+        for axis in 0..3 {
+            moment[axis] += p.item.weight * centre[axis];
+        }
+        weight += p.item.weight;
+    }
+    if let Some(deck) = &c.g.pallet {
+        let centre = [c.l / 2.0, c.ph / 2.0, c.w / 2.0];
+        for axis in 0..3 {
+            moment[axis] += deck.weight * centre[axis];
+        }
+        weight += deck.weight;
+    }
+    if weight > EPS {
+        moment.map(|value| value / weight)
+    } else {
+        [c.l / 2.0, c.h / 2.0, c.w / 2.0]
+    }
+}
+
 #[wasm_bindgen]
 pub fn run_pack_engine_v4(
     templates_json: &str,
@@ -411,7 +442,9 @@ pub fn run_pack_engine_v4(
             let custom_count = slots.len() as u32;
             let mut c0 = check(template, &items)?;
             c0.copy = 0;
-            c0.qty = copies.checked_sub(custom_count).ok_or("逐托调整数量超过托数")?;
+            c0.qty = copies
+                .checked_sub(custom_count)
+                .ok_or("逐托调整数量超过托数")?;
             // 库存按 模板计数×模板托数 + 每定制托计数 合计校核，且不同组合间不重复占用。
             let mut totals = BTreeMap::<String, u64>::new();
             for c in std::iter::once(&c0).chain(slots.iter()) {
@@ -487,6 +520,7 @@ pub fn run_pack_engine_v4(
                 cargo_weight: c.weight - c.g.pallet.as_ref().map_or(0., |b| b.weight),
                 load_above: 0.,
                 parents: Vec::new(),
+                cog: unit_cog(c),
             };
             remaining.push(ItemDef {
                 name: name.clone(),
@@ -610,12 +644,12 @@ pub fn run_pack_engine_v4(
             r["palletBases"] = json!(bases);
             r["palletUnits"] = json!(group_records);
         }
-        out["engineVersion"] = json!("EMS v4.8 load-path mixed-pallet");
+        out["engineVersion"] = json!("EMS v4.9 load-path mixed-pallet");
         Ok(out)
     })();
     match result {
         Ok(v) => v.to_string(),
-        Err(e) => json!({"error":e,"engineVersion":"EMS v4.8 load-path mixed-pallet"}).to_string(),
+        Err(e) => json!({"error":e,"engineVersion":"EMS v4.9 load-path mixed-pallet"}).to_string(),
     }
 }
 #[wasm_bindgen]
@@ -662,6 +696,7 @@ pub fn arrange_pallet_v4(items_json: &str, group_json: &str) -> String {
             width: w,
             height: h,
             max_weight: cap.max(EPS * 10.),
+            ..Default::default()
         };
         if !container_is_valid(&bin) {
             return Err("托盘工作区尺寸无效".into());
