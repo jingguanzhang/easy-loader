@@ -1072,6 +1072,41 @@
         color: #6e828d;
         margin: 0 0 9px;
       }
+      .balance-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 5px 8px;
+        align-items: center;
+        font-size: 12px;
+      }
+      .balance-grid span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        color: #6e828d;
+        white-space: nowrap;
+      }
+      .balance-grid input {
+        width: 62px;
+        height: 22px;
+        padding: 0 4px;
+        border: 1px solid #aaaead;
+        background: #fff;
+        font: inherit;
+        color: #263443;
+        text-align: right;
+      }
+      .balance-note {
+        margin: 9px 0 0;
+        line-height: 1.6;
+      }
+      .balance-shift-note {
+        margin: 6px 0 0;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #8b5d16;
+      }
       .container-diagram {
         border: 1px solid #b5c2c8;
         margin-top: 17px;
@@ -4007,6 +4042,89 @@
                           </div>
                         </div>
                       </fieldset>
+                      <fieldset class="groupbox">
+                        <legend>重心与轴重限制</legend>
+                        <p class="strategy-label">
+                          填 0 表示不限制。启用后超限的货物改装下一柜，必要时整体平移货堆。
+                        </p>
+                        <div class="balance-grid">
+                          <label for="balance-cog-x">纵向重心偏移上限</label>
+                          <span
+                            ><input
+                              id="balance-cog-x"
+                              type="number"
+                              min="0"
+                              max="50"
+                              step="1"
+                              v-model.number="balanceLimits.cogX"
+                              :disabled="calculating"
+                              data-testid="balance-cog-x"
+                            />% 柜长</span
+                          >
+                          <label for="balance-cog-z">横向重心偏移上限</label>
+                          <span
+                            ><input
+                              id="balance-cog-z"
+                              type="number"
+                              min="0"
+                              max="50"
+                              step="1"
+                              v-model.number="balanceLimits.cogZ"
+                              :disabled="calculating"
+                              data-testid="balance-cog-z"
+                            />% 柜宽</span
+                          >
+                          <label for="balance-front-pos">前支点（前轴）位置</label>
+                          <span
+                            ><input
+                              id="balance-front-pos"
+                              type="number"
+                              step="1"
+                              v-model.number="balanceLimits.frontPos"
+                              :disabled="calculating"
+                              data-testid="balance-front-pos"
+                            />% 柜长</span
+                          >
+                          <label for="balance-rear-pos">后支点（后轴）位置</label>
+                          <span
+                            ><input
+                              id="balance-rear-pos"
+                              type="number"
+                              step="1"
+                              v-model.number="balanceLimits.rearPos"
+                              :disabled="calculating"
+                              data-testid="balance-rear-pos"
+                            />% 柜长</span
+                          >
+                          <label for="balance-max-front">前支点限载</label>
+                          <span
+                            ><input
+                              id="balance-max-front"
+                              type="number"
+                              min="0"
+                              step="100"
+                              v-model.number="balanceLimits.maxFront"
+                              :disabled="calculating"
+                              data-testid="balance-max-front"
+                            />kg</span
+                          >
+                          <label for="balance-max-rear">后支点限载</label>
+                          <span
+                            ><input
+                              id="balance-max-rear"
+                              type="number"
+                              min="0"
+                              step="100"
+                              v-model.number="balanceLimits.maxRear"
+                              :disabled="calculating"
+                              data-testid="balance-max-rear"
+                            />kg</span
+                          >
+                        </div>
+                        <p class="strategy-label balance-note">
+                          位置自前端内壁量起，0% 为前壁、100% 为尾门。载荷仅计货物与托盘，按杠杆原理分摊到两支点，不含车架与空柜自重。
+                        </p>
+                      </fieldset>
                       <div class="tip-block">
                         <b>三类设置互不混淆</b
                         >柜型偏好决定优先使用什么柜；<br />排布策略决定空间填充方向；<br />货物顺序决定先装哪些货物。<br /><br />单项货物的「装载顺序」优先于全局大货/小货偏好。
@@ -4696,12 +4814,49 @@
                           装载重量<strong>{{ fmt(activeRes?.totalWeight || 0) }} kg</strong>
                         </div>
                         <div>
-                          已用长度<strong>{{ fmt(activeRes?.usedLength || 0) }} mm</strong>
+                          已用长度<strong>{{ fmt(Math.round(activeRes?.usedLength || 0)) }} mm</strong>
                         </div>
                         <div>
-                          尾部余深<strong>{{ fmt(activeRes?.tailSpace || 0) }} mm</strong>
+                          尾部余深<strong>{{ fmt(Math.round(activeRes?.tailSpace || 0)) }} mm</strong>
                         </div>
+                        <template v-if="activeRes && typeof activeRes.cogX === 'number'">
+                          <div data-testid="result-cog-x">
+                            重心纵向<strong>{{
+                              balanceOffsetText(
+                                activeRes.cogX - activeRes.containerLength / 2,
+                                "偏尾门",
+                                "偏前端",
+                              )
+                            }}</strong>
+                          </div>
+                          <div data-testid="result-cog-z">
+                            重心横向<strong>{{
+                              balanceOffsetText(
+                                activeRes.cogZ - activeRes.containerWidth / 2,
+                                "偏 z 正向",
+                                "偏 z 负向",
+                              )
+                            }}</strong>
+                          </div>
+                          <template v-if="typeof activeRes.frontAxleLoad === 'number'">
+                            <div data-testid="result-front-load">
+                              前支点载荷<strong>{{ fmt(Math.round(activeRes.frontAxleLoad)) }} kg</strong>
+                            </div>
+                            <div data-testid="result-rear-load">
+                              后支点载荷<strong>{{ fmt(Math.round(activeRes.rearAxleLoad)) }} kg</strong>
+                            </div>
+                          </template>
+                        </template>
                       </div>
+                      <p
+                        class="balance-shift-note"
+                        v-if="activeRes && (Math.abs(activeRes.loadShiftX || 0) >= 1 || Math.abs(activeRes.loadShiftZ || 0) >= 1)"
+                        data-testid="result-load-shift"
+                      >
+                        为满足重心 / 轴重限制，货堆已整体平移（纵向
+                        {{ fmt(Math.round(activeRes.loadShiftX || 0)) }} mm，横向
+                        {{ fmt(Math.round(activeRes.loadShiftZ || 0)) }} mm），留出的空隙需填充或限位。
+                      </p>
                     </div>
                     <div class="detail-tabs" role="tablist" aria-label="结果明细类别">
                       <button
@@ -7596,6 +7751,73 @@
               containerPriority = ref("large"),
               loadingStrategy = ref("wall"),
               loadingPreference = ref("large");
+            // 重心与轴重限制：百分比相对货柜内长/内宽，载荷为 kg；0 表示不限制。
+            const defaultBalanceLimits = () => ({
+              cogX: 0,
+              cogZ: 0,
+              frontPos: 0,
+              rearPos: 100,
+              maxFront: 0,
+              maxRear: 0,
+            });
+            function normalizeBalanceLimits(raw) {
+              const base = defaultBalanceLimits(),
+                out = {};
+              const num = (key, min, max) => {
+                const n = raw == null || raw[key] === "" ? NaN : Number(raw[key]);
+                return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : base[key];
+              };
+              out.cogX = num("cogX", 0, 50);
+              out.cogZ = num("cogZ", 0, 50);
+              out.frontPos = num("frontPos", -100, 200);
+              out.rearPos = num("rearPos", -100, 200);
+              out.maxFront = num("maxFront", 0, 1e9);
+              out.maxRear = num("maxRear", 0, 1e9);
+              if (!(out.rearPos > out.frontPos)) {
+                out.frontPos = base.frontPos;
+                out.rearPos = base.rearPos;
+              }
+              return out;
+            }
+            const balanceLimits = ref(defaultBalanceLimits());
+            const balanceActive = computed(() => {
+              const b = normalizeBalanceLimits(balanceLimits.value);
+              return b.cogX > 0 || b.cogZ > 0 || b.maxFront > 0 || b.maxRear > 0;
+            });
+            function balanceTemplateFields(container) {
+              const b = normalizeBalanceLimits(balanceLimits.value),
+                length = Number(container.length),
+                width = Number(container.width);
+              return {
+                maxCogOffsetX: (length * b.cogX) / 100,
+                maxCogOffsetZ: (width * b.cogZ) / 100,
+                frontAxlePos: (length * b.frontPos) / 100,
+                rearAxlePos: (length * b.rearPos) / 100,
+                maxFrontAxleLoad: b.maxFront,
+                maxRearAxleLoad: b.maxRear,
+              };
+            }
+            // 由结果明细独立复算重心与两支点载荷（杠杆原理），不依赖引擎回报值。
+            function loadBalanceOf(result, template) {
+              let weight = 0,
+                mx = 0,
+                mz = 0;
+              for (const p of [...(result.placed || []), ...(result.palletBases || [])]) {
+                weight += p.weight;
+                mx += p.weight * (p.x + p.dx / 2);
+                mz += p.weight * (p.z + p.dz / 2);
+              }
+              if (!(weight > 0)) return null;
+              const cogX = mx / weight,
+                cogZ = mz / weight,
+                span = template.rearAxlePos - template.frontAxlePos;
+              const rear = span > 0 ? (weight * (cogX - template.frontAxlePos)) / span : null;
+              return { weight, cogX, cogZ, rear, front: rear == null ? null : weight - rear };
+            }
+            function balanceOffsetText(value, positive, negative) {
+              const n = Math.round(Number(value) || 0);
+              return n === 0 ? "居中" : `${n > 0 ? positive : negative} ${fmt(Math.abs(n))} mm`;
+            }
             const items = ref([]),
               selectedItemId = ref(null),
               itemSearch = ref(""),
@@ -8229,6 +8451,7 @@
                 containerPriority: containerPriority.value,
                 loadingStrategy: loadingStrategy.value,
                 loadingPreference: loadingPreference.value,
+                balanceLimits: normalizeBalanceLimits(balanceLimits.value),
                 items: clone(items.value),
                 palletGroups: clone(palletGroups.value),
                 usePalletGroups: usePalletGroups.value,
@@ -8250,12 +8473,13 @@
                 width: Number(c.width),
                 height: Number(c.height),
                 maxWeight: Number(c.maxWeight),
+                ...balanceTemplateFields(c),
               }));
               const solverItems = PalletGeometry.engineItems(
                 validItems.value.map((it) => ({ ...clone(it), name: String(it.name).trim() })),
               );
               return {
-                engineRevision: "4.8",
+                engineRevision: "4.9",
                 templates,
                 items: solverItems,
                 palletGroups: usePalletGroups.value
@@ -8454,6 +8678,7 @@
               containerPriority.value = config.containerPriority === "small" ? "small" : "large";
               loadingStrategy.value = config.loadingStrategy === "floor" ? "floor" : "wall";
               loadingPreference.value = config.loadingPreference === "small" ? "small" : "large";
+              balanceLimits.value = normalizeBalanceLimits(config.balanceLimits);
               items.value = normalizeItems(config.items);
               selectedItemId.value = items.value[0]?.uid || null;
               focusedContainerKey.value = selectedPresets.value[0] || "20GP";
@@ -11081,6 +11306,31 @@
                   count += pieces;
                 }
                 if (weight > template.maxWeight + 0.01) throw new Error("装箱结果超过载重上限。");
+                const balance = loadBalanceOf(result, template);
+                if (balance) {
+                  if (
+                    (template.maxCogOffsetX > 0 &&
+                      Math.abs(balance.cogX - template.length / 2) >
+                        template.maxCogOffsetX + 0.5) ||
+                    (template.maxCogOffsetZ > 0 &&
+                      Math.abs(balance.cogZ - template.width / 2) > template.maxCogOffsetZ + 0.5)
+                  )
+                    throw new Error("装箱结果的重心偏移超过设定上限。");
+                  if (
+                    balance.rear != null &&
+                    ((template.maxFrontAxleLoad > 0 &&
+                      balance.front > template.maxFrontAxleLoad + 0.05) ||
+                      (template.maxRearAxleLoad > 0 &&
+                        balance.rear > template.maxRearAxleLoad + 0.05))
+                  )
+                    throw new Error("装箱结果的支点（轴）载荷超过设定上限。");
+                  if (
+                    ["cogX", "cogZ"].some(
+                      (k) => typeof result[k] === "number" && Math.abs(result[k] - balance[k]) > 0.5,
+                    )
+                  )
+                    throw new Error("引擎回报的重心与明细复算不一致。");
+                }
                 if (Math.abs(weight - result.totalWeight) > 0.02 || count !== result.placedCount)
                   throw new Error("装箱汇总与明细数量不一致。");
               }
@@ -12569,6 +12819,9 @@
               containerPriority,
               loadingStrategy,
               loadingPreference,
+              balanceLimits,
+              balanceActive,
+              balanceOffsetText,
               items,
               selectedItem,
               selectedItemId,
